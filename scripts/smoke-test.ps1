@@ -5,6 +5,7 @@
 #   powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -Build              # build Gothic2Notr first
 #   powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -Mode idle -Seconds 45 -ExtraArgs "-game:Mod.ini"
 #   powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -Marvin "set time 13 0;zstartrain 0.5" -ScreenshotAt "12,20"
+#   powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -Mode idle -LoadSave build\smoke-a\save_slot_1.sav -Marvin "weather"
 #
 # Modes:
 #   benchmark (default)  Runs with `-benchmark ci`: the world's TIMEDEMO camera path is played, FPS is logged and the
@@ -17,7 +18,9 @@
 #
 # -Marvin runs console commands once the world is loaded (game flag `-marvin`, ';'-separated); a command that
 # fails counts as a test failure. -ScreenshotAt captures the game window at the given seconds after start
-# (shot_<N>s.png in the run directory). Music is off unless -Music is passed.
+# (shot_<N>s.png in the run directory). Music is off unless -Music is passed. Output of the commands is logged as
+# "marvin output: ..." in log.txt. -LoadSave copies a savegame into the run directory as slot 1 and starts the game
+# from it (`-save 1`); the console command `save game` writes save_slot_1.sav, so two runs can test save and load.
 # Exit code: 0 = pass, 1 = fail.
 
 param(
@@ -32,6 +35,7 @@ param(
   [string]$RunDir = "",
   [string]$Marvin = "",
   [string]$ScreenshotAt = "",
+  [string]$LoadSave = "",
   [switch]$Music,
   [switch]$Build
 )
@@ -108,10 +112,18 @@ if(-not (Test-Path $exe)) {
 if(-not $RunDir) {
   $RunDir = Join-Path $root "$BuildDir\smoke"
   }
+$saveBytes = $null
+if($LoadSave) {
+  # read before the run directory is cleared, the save may come from a previous run there
+  $saveBytes = [IO.File]::ReadAllBytes((Resolve-Path $LoadSave).Path)
+  }
 if(Test-Path $RunDir) {
   Remove-Item -Recurse -Force $RunDir
   }
 New-Item -ItemType Directory -Force $RunDir | Out-Null
+if($saveBytes) {
+  [IO.File]::WriteAllBytes((Join-Path $RunDir "save_slot_1.sav"), $saveBytes)
+  }
 if(-not $Music) {
   # Gothic.ini in the working directory overrides the game's own; keeps the run quiet and sound effects audible
   "[SOUND]`r`nmusicEnabled=0`r`n" | Set-Content -Encoding ascii (Join-Path $RunDir "Gothic.ini")
@@ -126,6 +138,9 @@ if($World) {
   }
 if($Marvin) {
   $gameArgs += @("-marvin", "`"$Marvin`"")
+  }
+if($LoadSave) {
+  $gameArgs += @("-save", "1")
   }
 $gameArgs += $ExtraArgs
 
