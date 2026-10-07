@@ -4,6 +4,7 @@
 #   powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -GothicPath "D:\Games\Gothic II"
 #   powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -Build              # build Gothic2Notr first
 #   powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -Mode idle -Seconds 45 -ExtraArgs "-game:Mod.ini"
+#   powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -Marvin "set time 13 0;zstartrain 0.5" -ScreenshotAt "12,20"
 #
 # Modes:
 #   benchmark (default)  Runs with `-benchmark ci`: the world's TIMEDEMO camera path is played, FPS is logged and the
@@ -13,6 +14,10 @@
 #
 # The game runs in its own working directory (build/smoke by default), so log.txt, crash.log and Gothic.ini
 # of the run end up there and do not mix with manual play sessions. A summary is written to summary.json.
+#
+# -Marvin runs console commands once the world is loaded (game flag `-marvin`, ';'-separated); a command that
+# fails counts as a test failure. -ScreenshotAt captures the game window at the given seconds after start
+# (shot_<N>s.png in the run directory); the window has to be visible on the desktop.
 # Exit code: 0 = pass, 1 = fail.
 
 param(
@@ -25,10 +30,46 @@ param(
   [string[]]$ExtraArgs = @(),
   [string]$BuildDir = "build",
   [string]$RunDir = "",
+  [string]$Marvin = "",
+  [string]$ScreenshotAt = "",
   [switch]$Build
 )
 
 $ErrorActionPreference = "Stop"
+
+function Save-GameScreenshots($Proc, $Stopwatch, [string]$At, [string]$Dir) {
+  Add-Type -AssemblyName System.Drawing
+  if(-not ("SmokeWin" -as [type])) {
+    Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class SmokeWin {
+  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+}
+"@
+    }
+  [SmokeWin]::SetProcessDPIAware() | Out-Null
+  foreach($t in ($At.Split(',') | ForEach-Object { [int]$_ })) {
+    while($Stopwatch.Elapsed.TotalSeconds -lt $t -and -not $Proc.HasExited) { Start-Sleep -Milliseconds 200 }
+    if($Proc.HasExited) { break }
+    $Proc.Refresh()
+    $h = $Proc.MainWindowHandle
+    [SmokeWin]::SetForegroundWindow($h) | Out-Null
+    Start-Sleep -Milliseconds 300
+    $r = New-Object SmokeWin+RECT
+    [SmokeWin]::GetWindowRect($h, [ref]$r) | Out-Null
+    $bmp = New-Object System.Drawing.Bitmap ($r.R - $r.L), ($r.B - $r.T)
+    $g   = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.CopyFromScreen($r.L, $r.T, 0, 0, $bmp.Size)
+    $file = Join-Path $Dir ("shot_{0:D2}s.png" -f $t)
+    $bmp.Save($file, [System.Drawing.Imaging.ImageFormat]::Png)
+    $g.Dispose(); $bmp.Dispose()
+    $file
+    }
+  }
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
@@ -71,6 +112,9 @@ if($Mode -eq "benchmark") {
 if($World) {
   $gameArgs += @("-w", $World)
   }
+if($Marvin) {
+  $gameArgs += @("-marvin", "`"$Marvin`"")
+  }
 $gameArgs += $ExtraArgs
 
 Write-Host "Running: $exe $($gameArgs -join ' ')"
@@ -78,6 +122,11 @@ Write-Host "Working directory: $RunDir"
 
 $sw = [Diagnostics.Stopwatch]::StartNew()
 $proc = Start-Process -FilePath $exe -ArgumentList $gameArgs -WorkingDirectory $RunDir -PassThru
+
+$shots = @()
+if($ScreenshotAt) {
+  $shots = @(Save-GameScreenshots -Proc $proc -Stopwatch $sw -At $ScreenshotAt -Dir $RunDir)
+  }
 
 $failures = @()
 if($Mode -eq "benchmark") {
@@ -92,7 +141,8 @@ if($Mode -eq "benchmark") {
     }
   }
 else {
-  $exited = $proc.WaitForExit($Seconds * 1000)
+  $left   = [math]::Max(0, $Seconds*1000 - [int]$sw.Elapsed.TotalMilliseconds)
+  $exited = $proc.WaitForExit($left)
   if($exited) {
     $failures += "exited after $([int]$sw.Elapsed.TotalSeconds) s with code $($proc.ExitCode) before the $Seconds s window ended"
     }
@@ -118,6 +168,9 @@ if(Test-Path $crashFile) {
   }
 if($log | Select-String -SimpleMatch "invalid gothic path") {
   $failures += "game did not accept the Gothic path"
+  }
+foreach($m in ($log | Select-String -Pattern '^marvin: (.*) failed$')) {
+  $failures += "console command failed: $($m.Matches[0].Groups[1].Value)"
   }
 
 $fps = $null
@@ -146,6 +199,7 @@ $summary = [ordered]@{
   failures        = $failures
   warningCount    = @($warnings).Count
   warnings        = @($warnings)
+  screenshots     = @($shots)
   logFile         = $logFile
   }
 $summary | ConvertTo-Json -Depth 3 | Set-Content -Encoding utf8 (Join-Path $RunDir "summary.json")
@@ -156,6 +210,7 @@ if($fps) {
   Write-Host "FPS: $fps (low 1%: $low1)"
   }
 Write-Host "Unique warnings in log: $(@($warnings).Count) (see summary.json)"
+$shots | ForEach-Object { Write-Host "Screenshot: $_" }
 if(Test-Path $crashFile) {
   Write-Host "--- crash.log (tail)"
   Get-Content $crashFile -Tail 30 | ForEach-Object { Write-Host $_ }
