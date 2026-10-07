@@ -1143,6 +1143,16 @@ void MainWindow::onWorldLoaded() {
     benchmark.clear();
     }
 
+  static bool startupCmds = true;
+  if(startupCmds) {
+    startupCmds = false;
+    Marvin marvin;
+    for(auto& cmd:CommandLine::inst().startupMarvinCmds()) {
+      const bool ok = marvin.exec(cmd);
+      Log::i("marvin: \"",cmd,"\"",(ok ? "" : " failed"));
+      }
+    }
+
   player   .clearInput();
   inventory.onWorldChanged();
   dialogs  .onWorldChanged();

@@ -86,6 +86,20 @@ CommandLine::CommandLine(int argc, const char** argv) {
     else if(arg=="-window") {
       isWindow = true;
       }
+    else if(arg=="-marvin") {
+      // console commands to run once the first world is loaded, separated by ';'
+      ++i;
+      if(i<argc) {
+        std::string_view cmds = argv[i];
+        while(!cmds.empty()) {
+          size_t sep = cmds.find(';');
+          auto   cmd = cmds.substr(0,sep);
+          if(!cmd.empty())
+            marvinCmd.emplace_back(cmd);
+          cmds = (sep==std::string_view::npos) ? std::string_view() : cmds.substr(sep+1);
+          }
+        }
+      }
     else if(arg=="-nomenu") {
       noMenu = true;
       }
