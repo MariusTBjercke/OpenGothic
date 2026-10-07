@@ -129,7 +129,8 @@ if(-not $Music) {
   "[SOUND]`r`nmusicEnabled=0`r`n" | Set-Content -Encoding ascii (Join-Path $RunDir "Gothic.ini")
   }
 
-$gameArgs = @("-g", "`"$GothicPath`"", "-nomenu", "-window")
+# -novideo: no intro video on a new game, so idle runs reach the world (and -Marvin runs) right away
+$gameArgs = @("-g", "`"$GothicPath`"", "-nomenu", "-window", "-novideo")
 if($Mode -eq "benchmark") {
   $gameArgs += @("-benchmark", "ci")
   }
