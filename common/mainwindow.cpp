@@ -1233,7 +1233,9 @@ void MainWindow::render(){
 
     static bool once=true;
     if(once) {
-      Gothic::inst().emitGlobalSoundWav("GAMESTART.WAV");
+      // GAMESTART.WAV is a full-length music track; it would play through a whole benchmark run
+      if(!Gothic::inst().isBenchmarkMode())
+        Gothic::inst().emitGlobalSoundWav("GAMESTART.WAV");
       once=false;
       }
 

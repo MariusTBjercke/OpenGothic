@@ -218,7 +218,8 @@ powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -Mode idle -Seco
   `Gothic.ini` and `summary.json` (pass/fail, FPS, unique warnings). Compare `warnings` in two
   `summary.json` files to spot new log errors from a change.
 - Music is disabled (a `Gothic.ini` with `[SOUND] musicEnabled=0` is written to the run directory); pass `-Music`
-  to keep it.
+  to keep it. `GAMESTART.WAV` (the 43 s main menu theme, played as a sound effect, not via the music system)
+  is skipped in benchmark mode, so a rain run is quiet apart from sound effects.
 - Exit code 0 = pass, 1 = fail. It opens a real game window, so it needs a desktop session and a GPU.
 
 Expected noise in `log.txt`, not regressions: `unable to load archive` for Union DLLs / zipped VDFs in
