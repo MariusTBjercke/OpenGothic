@@ -171,13 +171,13 @@ ParticleFx& Weather::rainParticles() {
   src.vis_name_s            = "SKYRAIN.TGA";
   src.vis_orientation_s     = "VELO";
   src.vis_tex_is_quadpoly   = 1;
-  src.vis_tex_color_start_s = "255 255 255";
-  src.vis_tex_color_end_s   = "255 255 255";
+  src.vis_tex_color_start_s = "190 200 220";
+  src.vis_tex_color_end_s   = "190 200 220";
   src.vis_size_start_s      = "6 100";
   src.vis_size_end_scale    = 1;
-  src.vis_alpha_func_s      = "BLEND";
-  src.vis_alpha_start       = 220;
-  src.vis_alpha_end         = 220;
+  src.vis_alpha_func_s      = "ADD"; // unlit, so drops stay visible in the dimmed rain light
+  src.vis_alpha_start       = 160;
+  src.vis_alpha_end         = 160;
   src.use_emitters_for      = 0;
 
   fx.reset(new ParticleFx(src,"OG_WEATHER_RAIN"));
