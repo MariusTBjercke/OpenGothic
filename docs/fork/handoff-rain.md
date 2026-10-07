@@ -7,9 +7,9 @@ Status as of 2026-10-07 (second session). Written for the next agent picking thi
 
 - Branch: **`feat/rain`**, **not merged into `master` yet**. The user is play-testing it; merge when they say so
   (fast-forward or merge commit, then push `master`).
-- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@3c923b30` (see `BUILD.txt` there), i.e.
-  without the second session's commits. It holds the user's real saves; never use it as a working directory for
-  automated runs.
+- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@045795ce` (see `BUILD.txt` there).
+  It holds the user's real saves; never use it as a working directory for automated runs. `save game` typed in the
+  console there overwrites `save_slot_1.sav`, the first menu slot.
 
 Commits on the branch, oldest first (all self-contained, see `git log master..feat/rain`):
 
@@ -42,18 +42,17 @@ Commits on the branch, oldest first (all self-contained, see `git log master..fe
 - **Save/load of the weather state**, automated: run 1 forced rain and ran `save game`; the entry
   `worlds/newworld.zen/weather` held `prevSkyTime 13:00, rainStart 12:00, rainStop 14:12`. Run 2 started from that
   save with `-LoadSave` and `weather` printed `rain 12:00-14:12, weight 1.00, raining`. Recipe in `AGENTS.md`.
-- **CI** (fork, `workflow_dispatch` on `feat/rain@e3ef5032`, run 37677931592): Linux GCC, Windows MinGW,
-  macOS arm64 and x64 all green with `-Werror`. The five commits after `e3ef5032` were only built with MSVC.
+- **CI** (fork, `workflow_dispatch`): `feat/rain@e3ef5032` (run 37677931592) green on Linux GCC, Windows MinGW,
+  macOS arm64 and x64. `feat/rain@045795ce` (run 37680465171): Windows MinGW (GCC) and both macOS jobs (Clang)
+  green with `-Werror`; both Linux jobs hung for 28 min in `apt-get update` (GitHub mirror) and the run was
+  cancelled. Code-wise that covers GCC and Clang.
 - Smoke test passes; benchmark FPS ~76 on RTX 5070 Ti with rain, same as without drop rays.
 
 ## Not verified yet
 
-1. **CI for the commits after `e3ef5032`**. Push `feat/rain`, then
-   `gh workflow run Build -R MariusTBjercke/OpenGothic --ref feat/rain` (the workflow has `workflow_dispatch`;
-   it otherwise only runs on `master` and PRs into it).
-2. **NPC weather lines** via `Wld_IsRaining` (`B_Say_GuildGreetings`) in real play: start rain with
+1. **NPC weather lines** via `Wld_IsRaining` (`B_Say_GuildGreetings`) in real play: start rain with
    `zstartrain 0.5`, then talk to an ambient NPC outdoors.
-3. **Drops at roofs from the ground**: the screenshots were taken inside the tower and from the high benchmark
+2. **Drops at roofs from the ground**: the screenshots were taken inside the tower and from the high benchmark
    camera. Standing under a roof overhang or a market stall in the city has not been looked at.
 
 ## Gotchas learned the hard way
@@ -116,6 +115,9 @@ Commits on the branch, oldest first (all self-contained, see `git log master..fe
 
 - Conversation in Norwegian; repository docs and commits in English, Conventional Commits. Commits on this branch
   carry no co-author trailer.
+- **Don't dispatch CI after every change.** The user is mostly testing for themselves; run CI when a version is
+  close to done. A push to `master` runs it anyway (`gh workflow run Build ... --ref feat/rain` exists for the
+  rest). Verify locally with the MSVC build and the smoke test meanwhile.
 - Isolated fork: no issues/PRs/comments upstream (see `AGENTS.md`).
 - The user play-tests via `scripts/deploy-play.ps1` and gives quick feedback (they watch smoke-test windows too).
   Prefer visible/readable effects over strict realism (asked for brighter drops).
