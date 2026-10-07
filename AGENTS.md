@@ -60,6 +60,16 @@ issues, PRs or comments on Try/OpenGothic. Contributing upstream may happen late
 self-contained commits (one concern each) so individual fixes can be cherry-picked onto a clean
 branch from `upstream/master` if we decide to send them.
 
+### Deliberate differences from upstream
+
+Keep these when merging upstream changes:
+
+- **Start theme stops on load.** `GAMESTART.WAV` (43 s main menu theme, a sound effect, not music) is stopped when a
+  game starts loading (`Gothic::stopStartTheme` in `MainWindow::onStartLoading`) and skipped in benchmark mode.
+  Upstream keeps it playing into the level and declined changing that in issue #764, assuming vanilla does the same;
+  the user's Steam Gothic II stops it when a save starts loading.
+- **Rain** (`common/world/weather.*`), `-marvin` startup commands, and the Windows helper scripts in `scripts/`.
+
 ## Layout
 
 | Path                | Contents |
