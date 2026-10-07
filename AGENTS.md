@@ -109,8 +109,18 @@ branch from `upstream/master` if we decide to send them.
   the same source. Pipelines are created in `common/graphics/shaders.cpp`.
 - **New source file**: `common/**` and `spacer/**` are globbed (`GLOB_RECURSE`). Re-run CMake configure
   after adding files.
-- **Console command**: add to the table and `CmdType` enum in `common/marvin.*`.
+- **Console command**: add to the table and `CmdType` enum in `common/marvin.*`. Put a variant with arguments
+  (`"zstartrain %f"`) before the bare one (`"zstartrain"`), otherwise the bare entry wins with `C_Extra`.
 - **Graphics option / CLI flag**: `common/commandline.*` and `Gothic::Options` in `common/gothic.h`.
+- **Weather / rain** (fork): `common/world/weather.*`, owned by `World` (`world.weather()`). Reference behavior of
+  the original and current status in `docs/fork/research/rain.md`. Lighting hook in
+  `shader/lighting/sky_exposure.comp` (push constant `rain`).
+- **Run console commands at startup** (fork): `-marvin "set time 13 0;zstartrain 0.5"` executes `;`-separated
+  marvin commands once the first world has loaded (`MainWindow::onWorldLoaded`) and logs
+  `marvin: "<cmd>"` or `marvin: "<cmd>" failed`. Works without `-devmode`.
+- **Research on the original engine**: `Gothic2.exe` (2.6) is analyzed in a local Ghidra project with named
+  ZenGin functions. Record findings in `docs/fork/research/<topic>.md` as behavior and constants in your own words;
+  never commit decompiled code.
 
 ## Building
 
@@ -186,6 +196,12 @@ powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -Mode idle -Seco
   `TIMEDEMO` camera path, logs `Benchmark: low 1% = .. fps = ..` and exits by itself (~35 s on an RTX 5070 Ti).
   Vanilla `newworld.zen` has that camera; other worlds or mods may not, so use `idle` mode for them.
 - `idle` mode runs for `-Seconds`, then kills the game; it passes if the game was still alive.
+- `-Marvin "<cmd>;<cmd>"` passes console commands to the game (see `-marvin` above); a failed command fails the test.
+- `-ScreenshotAt "12,20"` saves `shot_<N>s.png` of the game window at those seconds. The benchmark camera path is
+  deterministic, so shots at the same second from two runs show the same view: use that for before/after
+  comparisons of visual changes. The window must be visible (not minimized or covered).
+- New game without `-benchmark` starts with the intro video and the Xardas dialog; prefer benchmark mode for
+  automated checks.
 - Each run gets a fresh working directory `build/smoke/` with `log.txt`, `crash.log` (only on crash),
   `Gothic.ini` and `summary.json` (pass/fail, FPS, unique warnings). Compare `warnings` in two
   `summary.json` files to spot new log errors from a change.
