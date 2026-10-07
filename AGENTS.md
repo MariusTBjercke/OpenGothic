@@ -53,8 +53,12 @@ Examples: `fix(npc): stop combat AI from re-equipping broken weapons`,
 
 Upstream history (Try/OpenGothic) uses free-form messages such as `editor: ...`,
 `cleanup`, `Update Tempest`. Leave those untouched when merging; the convention applies
-to commits made in this fork. Work on a branch and open PRs against `origin/master`;
-if a change should also go upstream, keep it self-contained so it can be cherry-picked.
+to commits made in this fork. Work on a branch and merge into `origin/master`.
+
+**Fork policy (current):** this is an isolated fork for experimenting and learning. Do not open
+issues, PRs or comments on Try/OpenGothic. Contributing upstream may happen later; until then, prefer
+self-contained commits (one concern each) so individual fixes can be cherry-picked onto a clean
+branch from `upstream/master` if we decide to send them.
 
 ## Layout
 
