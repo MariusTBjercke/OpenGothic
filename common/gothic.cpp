@@ -412,6 +412,15 @@ void Gothic::emitGlobalSoundWav(std::string_view wav) {
   sndStorage.push_back(std::move(s));
   }
 
+void Gothic::playStartTheme() {
+  startTheme = sndDev.load(Resources::loadSoundBuffer("GAMESTART.WAV"));
+  startTheme.play();
+  }
+
+void Gothic::stopStartTheme() {
+  startTheme = Tempest::SoundEffect();
+  }
+
  const std::vector<ItmFlags>& Gothic::invCatOrder() {
   return instance->inventoryOrder;
   }

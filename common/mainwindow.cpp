@@ -1127,6 +1127,7 @@ void MainWindow::onVideo(std::string_view fname) {
   }
 
 void MainWindow::onStartLoading() {
+  Gothic::inst().stopStartTheme();
   player   .clearInput();
   inventory.onWorldChanged();
   dialogs  .onWorldChanged();
@@ -1234,8 +1235,9 @@ void MainWindow::render(){
     static bool once=true;
     if(once) {
       // GAMESTART.WAV is a full-length music track; it would play through a whole benchmark run
-      if(!Gothic::inst().isBenchmarkMode())
-        Gothic::inst().emitGlobalSoundWav("GAMESTART.WAV");
+      // -nomenu/-save start loading before the first frame; don't start the theme over the loading screen
+      if(!Gothic::inst().isBenchmarkMode() && Gothic::inst().checkLoading()==Gothic::LoadState::Idle)
+        Gothic::inst().playStartTheme();
       once=false;
       }
 

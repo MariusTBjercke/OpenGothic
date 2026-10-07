@@ -104,6 +104,10 @@ class Gothic final {
 
     void         emitGlobalSoundWav(std::string_view wav);
 
+    // GAMESTART.WAV: a music track played as a sound; stopped once a game starts loading
+    void         playStartTheme();
+    void         stopStartTheme();
+
     static auto  invCatOrder()  -> const std::vector<ItmFlags>&;
 
     void         pushPause();
@@ -247,6 +251,7 @@ class Gothic final {
     std::unordered_map<std::string,SoundFx> sndFxCache;
     std::unordered_map<std::string,SoundFx> sndWavCache;
     std::vector<Tempest::SoundEffect>       sndStorage;
+    Tempest::SoundEffect                    startTheme;
 
     std::vector<std::unique_ptr<DocumentMenu::Show>> documents;
     ChapterScreen::Show                     chapter;
