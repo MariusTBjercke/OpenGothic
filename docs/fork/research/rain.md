@@ -109,13 +109,14 @@ Implemented in `common/world/weather.{h,cpp}` (class `Weather`, owned by `World`
   unchanged and older saves load with the default window.
 - `rain_01.wav` loop that follows the listener with the original volume slope, x0.25 inside portal rooms
   (`World::roomAt` is our stand-in for the unknown "sheltered" check).
-- Drops: a world-space box particle emitter (`SKYRAIN.TGA`, velocity aligned) 1250 in front of the camera,
+- Drops: a world-space box particle emitter (`SKYRAIN.TGA`, velocity aligned, additive) 1250 in front of the camera,
   density scaled with the weight, disabled inside portal rooms. No ray-tested splashes yet.
 - Lighting: `shader/lighting/sky_exposure.comp` dims direct sun (-80%) and ambient (-40%) by the rain weight
   after exposure is computed, the same way the cloud factor is applied, so the scene gets darker instead of the
   auto exposure brightening it.
 
-Not done yet: grey/overcast sky and rain cloud layer (`SKYRAINCLOUDS.TGA`), splashes, wind tilt
+Not done yet (prioritized list in `docs/fork/handoff-rain.md`): grey/overcast sky and rain cloud layer
+(`SKYRAINCLOUDS.TGA`), splashes, wind tilt
 (`zRainWindScale`), occlusion under roofs outside portal rooms, lightning.
 
 Verify with:
