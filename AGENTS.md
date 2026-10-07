@@ -131,8 +131,12 @@ Keep these when merging upstream changes:
   the original and current status in `docs/fork/research/rain.md`; open checks, gotchas and next steps in
   `docs/fork/handoff-rain.md`. Lighting hook in `shader/lighting/sky_exposure.comp` (push constant `rain`).
 - **Run console commands at startup** (fork): `-marvin "set time 13 0;zstartrain 0.5"` executes `;`-separated
-  marvin commands once the first world has loaded (`MainWindow::onWorldLoaded`) and logs
-  `marvin: "<cmd>"` or `marvin: "<cmd>" failed`. Works without `-devmode`.
+  marvin commands after the first frame that drew the world (`MainWindow::runStartupMarvinCmds`, called from
+  `render`) and logs `marvin: "<cmd>"` or `marvin: "<cmd>" failed`; what a command prints is logged as
+  `marvin output: ...`. Works without `-devmode`. Running them earlier, in `onWorldLoaded`, crashed `save game`:
+  its screenshot is drawn before the renderer had drawn the world once.
+- **Console save/load**: `save game` / `load game` use `save_slot_1.sav` like the original console (slot 1, not
+  the quick save slot 0). `weather` (fork) prints today's rain window, weight and shelter state.
 - **Research on the original engine**: `Gothic2.exe` (2.6) is analyzed in a local Ghidra project with named
   ZenGin functions. Record findings in `docs/fork/research/<topic>.md` as behavior and constants in your own words;
   never commit decompiled code.
@@ -221,6 +225,11 @@ powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -Mode idle -Seco
   Vanilla `newworld.zen` has that camera; other worlds or mods may not, so use `idle` mode for them.
 - `idle` mode runs for `-Seconds`, then kills the game; it passes if the game was still alive.
 - `-Marvin "<cmd>;<cmd>"` passes console commands to the game (see `-marvin` above); a failed command fails the test.
+- `-LoadSave <file>` copies a savegame into the run directory as slot 1 and starts from it (`-save 1`). Save/load
+  test in two runs (use `idle`; benchmark mode has no player):
+  `-Mode idle -RunDir build\smoke-a -Marvin "set time 13 0;zstartrain 0.5;save game"`, then
+  `-Mode idle -RunDir build\smoke-b -LoadSave build\smoke-a\save_slot_1.sav -Marvin "weather"` and read the
+  `marvin output:` line in `build\smoke-b\log.txt`.
 - `-ScreenshotAt "12,20"` saves `shot_<N>s.png` of the game window at those seconds. The benchmark camera path is
   deterministic, so shots at the same second from two runs show the same view: use that for before/after
   comparisons of visual changes. The window must be visible (not minimized or covered).

@@ -87,6 +87,14 @@ Despite the name, `strength` is the position inside a new window of length `d = 
 - Fall direction is straight down, tilted by the global wind scaled with `zRainWindScale`.
 - Textures: `SKYRAIN.TGA` (drops), `SKYRAINSPLASH.TGA` (splashes); `rain_01.wav` loop.
 
+## Particle collision of script effects (`flyCollDet`)
+
+Not rain-specific, but relevant when copying the drop behavior to other effects. `zCParticleFX::UpdateParticle`
+(0x005af500) traces a ray along each particle's step for emitters with `flyCollDet_B >= 1`, on roughly every other
+update (a global counter gates it). On a hit, mode 1 and 2 reflect the velocity on the hit normal (with different
+damping), mode 3 sets the velocity to zero and any higher value ends the particle. If the emitter has a mark
+texture (`mrkTexture_S`), a `zCQuadMark` is placed at the hit. OpenGothic parses `flyCollDet` but ignores it.
+
 ## Save data (ZenKit `zenkit::SkyController`)
 
 `master_time, rain_weight, rain_start, rain_stop, rain_sct_timer, rain_snd_vol, day_ctr`,
@@ -110,19 +118,28 @@ Implemented in `common/world/weather.{h,cpp}` (class `Weather`, owned by `World`
 - `rain_01.wav` loop that follows the listener with the original volume slope, x0.25 inside portal rooms
   (`World::roomAt` is our stand-in for the unknown "sheltered" check).
 - Drops: a world-space box particle emitter (`SKYRAIN.TGA`, velocity aligned, additive) 1250 in front of the camera,
-  density scaled with the weight, disabled inside portal rooms. No ray-tested splashes yet.
+  density scaled with the weight, disabled inside portal rooms.
+- Drops stop at roofs and the ground: each new drop gets one `DynamicWorld::ray` from 50 m above it down to where
+  its lifetime would end (`ParticleFx::clipLife` hook, called from `PfxBucket::init`). The lifetime ends at the
+  first hit; drops whose ray hits above their spawn point (born under a roof) are not spawned. Measured with a
+  temporary counter: from the benchmark camera above the city about 16 % of drops are shortened and almost none
+  skipped; inside Xardas' tower 22 % are skipped and 15 % shortened. Benchmark FPS unchanged (76).
+  The hit points are where splashes would go; no splashes yet.
 - Lighting: `shader/lighting/sky_exposure.comp` dims direct sun (-80%) and ambient (-40%) by the rain weight
   after exposure is computed, the same way the cloud factor is applied, so the scene gets darker instead of the
   auto exposure brightening it.
 
 Not done yet (prioritized list in `docs/fork/handoff-rain.md`): grey/overcast sky and rain cloud layer
-(`SKYRAINCLOUDS.TGA`), splashes, wind tilt
-(`zRainWindScale`), occlusion under roofs outside portal rooms, lightning.
+(`SKYRAINCLOUDS.TGA`), splashes, wind tilt (`zRainWindScale`), lightning.
 
 Verify with:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -Marvin "set time 13 0;zstartrain 0.5" -ScreenshotAt "12,20"
+powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -Marvin "set time 13 0;zstartrain 0.5;weather" -ScreenshotAt "12,20"
 ```
+
+The `weather` console command prints the window as clock times, e.g. `rain 12:00-14:12, weight 1.00, raining`
+(logged as `marvin output: ...` when run through `-marvin`). Save/load of the weather entry: see the two-run
+`save game` / `-LoadSave` recipe in `AGENTS.md` (smoke test section).
 
 Avoid `set time 12 0` when testing: noon is where the sky day wraps, so a forced window gets clipped to zero.
