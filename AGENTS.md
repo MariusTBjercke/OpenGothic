@@ -66,7 +66,7 @@ if a change should also go upstream, keep it self-contained so it can be cherry-
 | `shader/`           | GLSL shaders, compiled to SPIR-V at build time and embedded in the binary. |
 | `lib/`              | Dependencies. Submodules: `Tempest`, `ZenKit`, `bullet3`, `dmusic`, `TinySoundFont`, `rapidjson`. Vendored: `edd-dbg`, `miniz`. |
 | `linux/`, `packaging/` | Debian packaging, Nix flake, AppStream metadata. |
-| `scripts/`          | `Gothic2Notr.bat` launcher copied next to the Windows build; `build-windows.ps1` (fork-only) MSVC build helper. |
+| `scripts/`          | `Gothic2Notr.bat` launcher copied next to the Windows build; `build-windows.ps1` and `smoke-test.ps1` (fork-only) build/test helpers. |
 
 ### Inside `common/`
 
@@ -152,8 +152,8 @@ Gotchas:
   `RelWithDebInfo` for everyday work.
 - The version string comes from `build.h`. The real one is `common/build.h`; CI overwrites a separate
   `game/build.h`, which only affects `game/main.cpp`.
-- There is **no test suite**. Verification means: it compiles on CI (Linux, Windows, macOS) and, for
-  gameplay changes, it behaves correctly in game.
+- There is **no unit test suite**. Verification means: it compiles (locally and on CI for Linux, Windows,
+  macOS), `scripts/smoke-test.ps1` passes, and for gameplay changes it behaves correctly in game.
 
 ## Running
 
@@ -168,8 +168,25 @@ Runtime files are written to the working directory: `log.txt`, `crash.log`, `Got
 When diagnosing a crash, read `log.txt` and `crash.log` first. `log.txt` is locked while the game runs;
 stop the process before reading it on Windows.
 
-Smoke test (no test suite exists): start with `-nomenu -window`, let it run ~30 s, kill it, then check that
-there is no `crash.log` and that `log.txt` shows the world loading (GPU name, NPC spawns).
+### Smoke test
+
+There is no unit test suite. After a change that compiles, run the smoke test (Windows):
+
+```powershell
+$env:OPENGOTHIC_GOTHIC_PATH = "D:\path\to\Gothic II"   # or pass -GothicPath
+powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -Build      # build Gothic2Notr, then test
+powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -Mode idle -Seconds 45 -ExtraArgs "-game:Mod.ini"
+```
+
+- `benchmark` mode (default) starts with `-nomenu -window -benchmark ci`. The game loads the world, plays the
+  `TIMEDEMO` camera path, logs `Benchmark: low 1% = .. fps = ..` and exits by itself (~35 s on an RTX 5070 Ti).
+  Vanilla `newworld.zen` has that camera; other worlds or mods may not, so use `idle` mode for them.
+- `idle` mode runs for `-Seconds`, then kills the game; it passes if the game was still alive.
+- Each run gets a fresh working directory `build/smoke/` with `log.txt`, `crash.log` (only on crash),
+  `Gothic.ini` and `summary.json` (pass/fail, FPS, unique warnings). Compare `warnings` in two
+  `summary.json` files to spot new log errors from a change.
+- Exit code 0 = pass, 1 = fail. It opens a real game window, so it needs a desktop session and a GPU.
+
 Expected noise in `log.txt`, not regressions: `unable to load archive` for Union DLLs / zipped VDFs in
 `Data/`, `not implemented call [...]`, `invalid spawnpoint`, `Accessing member "C_NPC.AIVAR" without an instance set`.
 
