@@ -2484,9 +2484,12 @@ void Renderer::prepareExposure(Encoder<CommandBuffer>& cmd, WorldView& wview) {
   struct Push {
     float baseL        = 0.0;
     float sunOcclusion = 1.0;
+    float rain         = 0.0;
     };
   Push push;
   push.sunOcclusion = smoothstep(0.0f, 0.01f, sunDir.y);
+  if(auto w = Gothic::inst().world())
+    push.rain = w->weather().rainWeight();
 
   static float override = 0;
   static float add      = 1.5f;

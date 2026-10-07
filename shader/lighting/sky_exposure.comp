@@ -12,6 +12,7 @@ layout(local_size_x = 128) in;
 layout(push_constant, std430) uniform UboPush {
   float baseL;
   float sunOcclusion;
+  float rain;
   } push;
 layout(binding = 0, std140) buffer UboScene {
   SceneDesc scene;
@@ -112,9 +113,13 @@ void main() {
 
     const float lum    = max(objLum*2.5, skyLum*clouds*1.5);
 
+    // rain: overcast blocks most direct sun and some sky light; applied after exposure, like clouds
+    const float overcastSun = 1.0 - 0.8*push.rain;
+    const float overcastAmb = 1.0 - 0.4*push.rain;
+
     // float lum = tr.b;
-    scene.sunColor     = sunColor * clouds * push.sunOcclusion;
-    scene.ambient      = ambient  * clouds;
+    scene.sunColor     = sunColor * clouds * push.sunOcclusion * overcastSun;
+    scene.ambient      = ambient  * clouds * overcastAmb;
     scene.exposure     = 1.0 / max(lum*1.25 + push.baseL, 0.0000001);
     //scene.exposure     = 1.0 / max(6400, 0.0000005);
     scene.luminanceMed = lum;
