@@ -53,6 +53,7 @@ class Marvin {
       C_ZTrigger,
       C_ZUntrigger,
       C_ZStartRain,
+      C_Weather,
 
       C_AiGoTo,
       C_GoToPos,

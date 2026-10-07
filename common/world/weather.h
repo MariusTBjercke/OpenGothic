@@ -4,6 +4,7 @@
 #include <Tempest/Vec>
 
 #include <cstdint>
+#include <string>
 
 #include "world/objects/pfxemitter.h"
 #include "game/gametime.h"
@@ -26,6 +27,9 @@ class Weather final {
 
     float rainWeight() const { return weight; }
     bool  isRaining()  const { return weight>0.3f; } // Wld_IsRaining threshold of the original
+
+    // one line for the 'weather' console command: today's window as clock times, weight, shelter
+    std::string statusLine() const;
 
     void  save(Serialize& fout) const;
     void  load(Serialize& fin);
@@ -52,6 +56,7 @@ class Weather final {
     bool          lightning   = false;
     bool          rainActive  = false;
 
+    bool          sheltered   = false;
     float         sndVolume   = 0.f;
     float         sndBase     = 1.f;
     Tempest::SoundEffect sound;

@@ -122,6 +122,7 @@ Marvin::Marvin() {
     {"version",                    C_Invalid},
     {"zstartrain %f",              C_ZStartRain},
     {"zstartrain",                 C_ZStartRain},
+    {"weather",                    C_Weather},
     {"zstartsnow",                 C_Invalid},
     {"ztimer multiplyer %f",       C_TimeMultiplyer},
     {"ztimer realtime",            C_TimeRealtime},
@@ -446,6 +447,13 @@ bool Marvin::exec(std::string_view v) {
         return false;
       world->weather().startRain(position);
       print("started rain");
+      return true;
+      }
+    case C_Weather: {
+      World* world = Gothic::inst().world();
+      if(world==nullptr)
+        return false;
+      print(world->weather().statusLine());
       return true;
       }
     case C_ZUntrigger: {

@@ -3,6 +3,8 @@
 #include <zenkit/addon/daedalus.hh>
 
 #include <algorithm>
+#include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <memory>
 
@@ -97,9 +99,28 @@ bool Weather::isSheltered(const Tempest::Vec3& pos) const {
   return !owner.roomAt(pos).empty();
   }
 
+std::string Weather::statusLine() const {
+  if(!enabled)
+    return "rain disabled ([GAME] skyEffects=0)";
+
+  // sky time 0 is noon
+  auto clock = [](float sky) {
+    const int minutes = int(std::lround(double(sky)*24.0*60.0)) + 12*60;
+    return minutes%(24*60);
+    };
+  const int t0 = clock(rainStart);
+  const int t1 = clock(rainStop);
+
+  char buf[128] = {};
+  std::snprintf(buf,sizeof(buf),"rain %02d:%02d-%02d:%02d, weight %.2f%s%s",
+                t0/60, t0%60, t1/60, t1%60, double(weight),
+                isRaining() ? ", raining" : "", sheltered ? ", sheltered" : "");
+  return buf;
+  }
+
 void Weather::tickFx(uint64_t dt) {
-  const auto lp        = owner.gameSession().camera().listenerPosition();
-  const bool sheltered = isSheltered(lp.pos);
+  const auto lp = owner.gameSession().camera().listenerPosition();
+  sheltered     = isSheltered(lp.pos);
 
   // sound: follows the rain weight with a fixed slope, quieter when sheltered
   const float target = weight*(sheltered ? 0.25f : 1.f);
