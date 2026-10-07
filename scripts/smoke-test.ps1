@@ -17,7 +17,7 @@
 #
 # -Marvin runs console commands once the world is loaded (game flag `-marvin`, ';'-separated); a command that
 # fails counts as a test failure. -ScreenshotAt captures the game window at the given seconds after start
-# (shot_<N>s.png in the run directory); the window has to be visible on the desktop.
+# (shot_<N>s.png in the run directory). Music is off unless -Music is passed.
 # Exit code: 0 = pass, 1 = fail.
 
 param(
@@ -32,6 +32,7 @@ param(
   [string]$RunDir = "",
   [string]$Marvin = "",
   [string]$ScreenshotAt = "",
+  [switch]$Music,
   [switch]$Build
 )
 
@@ -111,6 +112,10 @@ if(Test-Path $RunDir) {
   Remove-Item -Recurse -Force $RunDir
   }
 New-Item -ItemType Directory -Force $RunDir | Out-Null
+if(-not $Music) {
+  # Gothic.ini in the working directory overrides the game's own; keeps the run quiet and sound effects audible
+  "[SOUND]`r`nmusicEnabled=0`r`n" | Set-Content -Encoding ascii (Join-Path $RunDir "Gothic.ini")
+  }
 
 $gameArgs = @("-g", "`"$GothicPath`"", "-nomenu", "-window")
 if($Mode -eq "benchmark") {
