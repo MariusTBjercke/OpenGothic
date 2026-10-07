@@ -70,7 +70,7 @@ branch from `upstream/master` if we decide to send them.
 | `shader/`           | GLSL shaders, compiled to SPIR-V at build time and embedded in the binary. |
 | `lib/`              | Dependencies. Submodules: `Tempest`, `ZenKit`, `bullet3`, `dmusic`, `TinySoundFont`, `rapidjson`. Vendored: `edd-dbg`, `miniz`. |
 | `linux/`, `packaging/` | Debian packaging, Nix flake, AppStream metadata. |
-| `scripts/`          | `Gothic2Notr.bat` launcher copied next to the Windows build; `build-windows.ps1` and `smoke-test.ps1` (fork-only) build/test helpers. |
+| `scripts/`          | `Gothic2Notr.bat` launcher copied next to the Windows build; `build-windows.ps1`, `smoke-test.ps1` and `deploy-play.ps1` (fork-only) build/test/deploy helpers. |
 
 ### Inside `common/`
 
@@ -101,9 +101,12 @@ branch from `upstream/master` if we decide to send them.
   lower-case name. Partially implemented ones log `not implemented call [...]`.
 - **AI action queue (`AI_*` calls)**: queued via `world/aiqueue.*`, dispatched in `Npc::nextAiAction`
   (called from `Npc::implAiTick`) in `world/objects/npc.cpp`.
-- **Save/load**: `common/game/serialize.h`. `Serialize::Version::Current` is the save format version.
-  If you change what gets written, bump `Current` and gate reads on `fin.version()` so older saves still load
-  (pattern: `if(fin.version()<55) ... else ...`). Never break `MinVersion` loading silently.
+- **Save/load**: `common/game/serialize.h`. Saves are zip archives with named entries; `Serialize::Version::Current`
+  is the format version. Upstream bumps `Current` and gates reads on `fin.version()` (`if(fin.version()<55) ...`).
+  **In this fork, do not bump `Current` or change existing entries.** Store fork-only state in a new entry
+  and read it optionally (`if(fin.setEntry("worlds/",wname,"/weather")) ...`; `setEntry` returns false when the
+  entry is missing). That keeps saves loadable both ways between this fork and upstream OpenGothic, and avoids
+  a version clash when upstream bumps the number itself. Vanilla Gothic saves are a different format either way.
 - **New shader**: put the source under `shader/`, then register it with `add_shader(...)` in
   `shader/CMakeLists.txt` (nothing is picked up automatically). Variants are made with `-D` defines on
   the same source. Pipelines are created in `common/graphics/shaders.cpp`.
@@ -178,9 +181,17 @@ build/opengothic/Gothic2Notr -g "<path to Gothic II>"           # add -nomenu -w
 build/opengothic/Gothic2Notr -g "<path>" -window -devmode        # windowed, marvin mode on
 ```
 
-Runtime files are written to the working directory: `log.txt`, `crash.log`, `Gothic.ini`, saves.
-When diagnosing a crash, read `log.txt` and `crash.log` first. `log.txt` is locked while the game runs;
-stop the process before reading it on Windows.
+Runtime files are written to the working directory: `log.txt`, `crash.log`, `Gothic.ini`, saves
+(`save_slot_N.sav`). When diagnosing a crash, read `log.txt` and `crash.log` first. `log.txt` is locked while
+the game runs; stop the process before reading it on Windows.
+
+### Play folder (for the human playing, Windows)
+
+`scripts/deploy-play.ps1` builds, runs the smoke test and copies the result to a stable folder outside the repo
+(default `OpenGothic-play` next to the Gothic installation, override with `-Dest` or `OPENGOTHIC_PLAY_DIR`).
+It writes `BUILD.txt` (branch/commit), `Play.bat` and `Play (devmode).bat`, and never touches saves or
+`Gothic.ini` there. It refuses to deploy while the game runs from that folder. Don't run test builds with that
+folder as working directory; it holds the user's real saves.
 
 ### Smoke test
 
