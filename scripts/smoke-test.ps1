@@ -33,6 +33,10 @@ $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
 if(-not $GothicPath) {
+  # set after this shell started? read it from the user environment in the registry
+  $GothicPath = [Environment]::GetEnvironmentVariable("OPENGOTHIC_GOTHIC_PATH", "User")
+  }
+if(-not $GothicPath) {
   throw "No Gothic path. Pass -GothicPath or set OPENGOTHIC_GOTHIC_PATH."
   }
 if(-not (Test-Path (Join-Path $GothicPath "Data"))) {

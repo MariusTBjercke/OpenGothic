@@ -173,7 +173,7 @@ stop the process before reading it on Windows.
 There is no unit test suite. After a change that compiles, run the smoke test (Windows):
 
 ```powershell
-$env:OPENGOTHIC_GOTHIC_PATH = "D:\path\to\Gothic II"   # or pass -GothicPath
+# Gothic path: -GothicPath, else $env:OPENGOTHIC_GOTHIC_PATH (also read from the user registry env if the shell is stale)
 powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -Build      # build Gothic2Notr, then test
 powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -Mode idle -Seconds 45 -ExtraArgs "-game:Mod.ini"
 ```
