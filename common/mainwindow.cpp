@@ -1144,16 +1144,6 @@ void MainWindow::onWorldLoaded() {
     benchmark.clear();
     }
 
-  static bool startupCmds = true;
-  if(startupCmds) {
-    startupCmds = false;
-    Marvin marvin;
-    for(auto& cmd:CommandLine::inst().startupMarvinCmds()) {
-      const bool ok = marvin.exec(cmd);
-      Log::i("marvin: \"",cmd,"\"",(ok ? "" : " failed"));
-      }
-    }
-
   player   .clearInput();
   inventory.onWorldChanged();
   dialogs  .onWorldChanged();
@@ -1174,6 +1164,20 @@ void MainWindow::onWorldLoaded() {
     pl->multSpeed(1.f);
   lastTick = Application::tickCount();
   player.clearFocus();
+  }
+
+void MainWindow::runStartupMarvinCmds() {
+  // command output goes to log.txt, so automated runs can read it
+  struct Output {
+    void print(std::string_view msg) { Log::i("marvin output: ",msg); }
+    };
+  Output out;
+  Marvin marvin;
+  marvin.print.bind(&out,&Output::print);
+  for(auto& cmd:CommandLine::inst().startupMarvinCmds()) {
+    const bool ok = marvin.exec(cmd);
+    Log::i("marvin: \"",cmd,"\"",(ok ? "" : " failed"));
+    }
   }
 
 void MainWindow::onSessionExit() {
@@ -1290,6 +1294,14 @@ void MainWindow::render(){
     sync = device.submit(cmd);
     device.present(swapchain);
     cmdId = (cmdId+1u)%Resources::MaxFramesInFlight;
+
+    // -marvin: after the first drawn world frame; `save game` needs a world the renderer has drawn before
+    static bool startupCmds = !CommandLine::inst().startupMarvinCmds().empty();
+    if(T_UNLIKELY(startupCmds) && Gothic::inst().worldView()!=nullptr && !video.isActive() &&
+       Gothic::inst().checkLoading()==Gothic::LoadState::Idle) {
+      startupCmds = false;
+      runStartupMarvinCmds();
+      }
 
     auto t = Application::tickCount();
     auto frameTime = maxFpsInv;

@@ -82,6 +82,7 @@ class MainWindow : public Tempest::Window {
     void onVideo(std::string_view fname);
     void onStartLoading();
     void onWorldLoaded();
+    void runStartupMarvinCmds();
     void onSessionExit();
     void onBenchmarkFinished();
     void setGameImpl(std::unique_ptr<GameSession>&& w);
