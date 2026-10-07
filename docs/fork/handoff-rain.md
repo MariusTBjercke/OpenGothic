@@ -7,7 +7,7 @@ Status as of 2026-10-07 (second session). Written for the next agent picking thi
 
 - Branch: **`feat/rain`**, **not merged into `master` yet**. The user is play-testing it; merge when they say so
   (fast-forward or merge commit, then push `master`).
-- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@045795ce` (see `BUILD.txt` there).
+- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@ff6b424f` (see `BUILD.txt` there).
   It holds the user's real saves; never use it as a working directory for automated runs. `save game` typed in the
   console there overwrites `save_slot_1.sav`, the first menu slot.
 
@@ -28,16 +28,22 @@ Commits on the branch, oldest first (all self-contained, see `git log master..fe
 | `06575ea0` | `weather` console command |
 | `b9ff997d` | smoke test `-LoadSave <file>` |
 | `2ccd4e65` | drops stop at roofs and the ground (one physics ray per new drop) |
+| `d63dbd0c`, `bcba6f14` | `-novideo` flag (skips script videos such as the intro); the smoke test passes it |
+| `ff6b424f` | drops stay on in portal rooms (rain visible from caves), shelter ray starts above the world mesh |
 | docs commits | `AGENTS.md`, research notes, this file |
 
 ## What works (verified)
 
 - Logic matches vanilla: one random window per game day rolled at the noon wrap (not when sleeping over noon),
   weight ramp 20/60/20 %, `Wld_IsRaining` = weight > 0.3, `zstartrain [pos]` semantics, `skyEffects=0` disables.
-- Sound: `RAIN_01.WAV` loop owned by `Weather`, volume slope as vanilla, x0.25 inside portal rooms. User heard it.
+- Sound: `RAIN_01.WAV` loop owned by `Weather`, volume slope as vanilla, x0.25 inside portal rooms and under water.
+  User heard it.
 - Drops: world-space box emitter 12.5 m in front of the camera, ~1000 drops at full weight, additive. User saw them.
 - Drops end at the first static hit and are not spawned under roofs. Screenshot comparison in Xardas' tower (new
   game start, not a portal room): streaks inside before, none after. Counter numbers are in the research notes.
+- Drops are no longer switched off in portal rooms (user report: rain outside vanished when looking out of a
+  cave). Vanilla only hides rain when no outdoor area is visible (research notes, "Sound volume"). In two cave
+  runs (`goto waypoint NW_CITYFOREST_CAVE_01` / `_06`) the rays skipped every drop.
 - Lighting: darker overcast look. Sky stays blue (only dimmed).
 - **Save/load of the weather state**, automated: run 1 forced rain and ran `save game`; the entry
   `worlds/newworld.zen/weather` held `prevSkyTime 13:00, rainStart 12:00, rainStop 14:12`. Run 2 started from that
@@ -54,6 +60,8 @@ Commits on the branch, oldest first (all self-contained, see `git log master..fe
    `zstartrain 0.5`, then talk to an ambient NPC outdoors.
 2. **Drops at roofs from the ground**: the screenshots were taken inside the tower and from the high benchmark
    camera. Standing under a roof overhang or a market stall in the city has not been looked at.
+3. **Looking out of a cave** (the user's report that led to `ff6b424f`): rain outside should now be visible from
+   inside; only the automated runs above were done, and their camera ended up looking down at the hero.
 
 ## Gotchas learned the hard way
 
@@ -76,7 +84,9 @@ Commits on the branch, oldest first (all self-contained, see `git log master..fe
 - **`PfxBucket::tickEmit` skips particles whose `init` leaves `life == 0`**, so `clipLife` can drop a particle by
   returning 0. A particle with `life == 0` that was counted would never be freed.
 - **`World::roomAt` gives false positives** (e.g. `TURMOST02`, `MATTEO`) when the camera is above roofs next to a
-  portal room, which turns drops off and lowers the sound. It also scans all BSP sectors per call.
+  portal room, which lowers the sound. It also scans all BSP sectors per call. It no longer switches drops off.
+- **Script videos block `-marvin`**: startup commands wait for a drawn world frame, and a new game plays the intro
+  first. The smoke test passes `-novideo`; without it an idle run on a new game never ran its commands.
 - **Screenshots**: `-ScreenshotAt` uses `PrintWindow(PW_RENDERFULLCONTENT)`. The benchmark camera path is close to
   deterministic, but two runs at the same second can differ by a few frames and in exposure; thin drops are hard to
   compare from the high benchmark camera. A temporary counter in the code and the tower start view were more useful.
@@ -98,9 +108,8 @@ Commits on the branch, oldest first (all self-contained, see `git log master..fe
 2. **Splashes** with `SKYRAINSPLASH.TGA` at the hit points (vanilla does this). `clipDrop` already computes the
    hit (`hit.v`) and the time of impact; a second emitter or a small list of timed splash positions fed from there
    is the simplest route. `mrk*` fields are parsed but not implemented.
-3. **Better shelter detection** than `roomAt` for sound and for switching drops off: a short upward physics ray
-   from the camera (roof check), cached for a few frames; keep `roomAt` for portal rooms. Now that drops are clipped
-   per ray, `roomAt` is mostly needed for the x0.25 sound volume.
+3. **Better shelter detection** than `roomAt` for the x0.25 sound volume (its only remaining use): a short
+   upward physics ray from the camera (roof check), cached for a few frames; keep `roomAt` for portal rooms.
 4. **Grey overcast sky**: research `RenderRainCloudLayer` (0x005e5d00) for how much vanilla darkens and how
    `SKYRAINCLOUDS.TGA` is blended, then add a rain term to the sky/cloud shaders (`shader/sky/*`) and some fog.
    Renderer files change often upstream; keep the hook small (one push constant / scene field).

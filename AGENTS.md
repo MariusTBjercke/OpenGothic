@@ -70,7 +70,8 @@ Keep these when merging upstream changes:
   Vanilla does not: `zCMenu::Enter` (0x004db780) plays GAMESTART once when the main menu first opens, and
   `zCMenu::Leave` (0x004db910) releases that sound, which stops it as soon as the menu is left for a new game or a
   load. Also observed in the user's Steam Gothic II.
-- **Rain** (`common/world/weather.*`), `-marvin` startup commands, and the Windows helper scripts in `scripts/`.
+- **Rain** (`common/world/weather.*`), `-marvin` startup commands, the `-novideo` flag, and the Windows helper
+  scripts in `scripts/`.
 
 ## Layout
 
@@ -233,8 +234,10 @@ powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -Mode idle -Seco
 - `-ScreenshotAt "12,20"` saves `shot_<N>s.png` of the game window at those seconds. The benchmark camera path is
   deterministic, so shots at the same second from two runs show the same view: use that for before/after
   comparisons of visual changes. The window must be visible (not minimized or covered).
-- New game without `-benchmark` starts with the intro video and the Xardas dialog; prefer benchmark mode for
-  automated checks.
+- The script passes `-novideo` (fork flag: videos started by scripts are skipped), so a new game in `idle` mode
+  starts in the world right away; `-marvin` commands wait for a drawn world frame and would otherwise wait out the
+  intro. The Xardas dialog still starts a few seconds in. `goto waypoint <name>` moves the player elsewhere, e.g.
+  `NW_CITYFOREST_CAVE_06` for a cave; waypoint names can be read from `Data/Worlds.vdf` as plain strings.
 - Each run gets a fresh working directory `build/smoke/` with `log.txt`, `crash.log` (only on crash),
   `Gothic.ini` and `summary.json` (pass/fail, FPS, unique warnings). Compare `warnings` in two
   `summary.json` files to spot new log errors from a change.

@@ -56,8 +56,13 @@ the weight drops to 0.
 
 ## Sound volume
 
-- Target volume = rain weight, multiplied by **0.25** when the camera is in a sheltered state
-  (an indoor/underwater check via a virtual method; exact meaning to be confirmed).
+- Target volume = rain weight, multiplied by **0.25** when the camera is indoors or under water.
+  "Indoors" is the camera location hint that `zCBspTree::Render` (0x00530080) passes to the sky controller every
+  frame (`SetCameraLocationHint`, stored at +0x698): 0 = outside all sectors, 1 = inside a sector with no outdoor
+  area visible, 2 = inside a sector with outdoor area visible through a portal. Under water is
+  `GetUnderwaterFX` (vtable+0x54).
+- Drops are created and updated in every case; only hint 1 skips drawing them. Looking out of a cave or a house
+  (hint 2) shows the rain outside.
 - Actual volume moves toward the target by `0.0005 * frameTimeMs` per frame (0 to 1 in 2 s),
   clamped to 0..1.
 - Sound file: `rain_01.wav`.
@@ -102,7 +107,6 @@ plus G1-only `fade_scale, render_lightning, is_raining, rain_ctr`.
 
 ## Open questions
 
-- What the 0.25 volume condition checks exactly (virtual at vtable+0x54, flag at +0x698).
 - Particle parameters (count, area around camera, speed, splash ray-tests) in `zCOutdoorRainFX`.
 - How much `RenderRainCloudLayer` darkens the sky, and fog changes during rain.
 - `zRainWindScale` (`[SKY_OUTDOOR]` ini) effect on drop direction.
@@ -116,14 +120,17 @@ Implemented in `common/world/weather.{h,cpp}` (class `Weather`, owned by `World`
 - State is saved per world in the optional save entry `worlds/<zen>/weather`, so the save format version is
   unchanged and older saves load with the default window.
 - `rain_01.wav` loop that follows the listener with the original volume slope, x0.25 inside portal rooms
-  (`World::roomAt` is our stand-in for the unknown "sheltered" check).
+  (`World::roomAt`, our stand-in for location hints 1 and 2) and under water (`Camera::isInWater`).
 - Drops: a world-space box particle emitter (`SKYRAIN.TGA`, velocity aligned, additive) 1250 in front of the camera,
-  density scaled with the weight, disabled inside portal rooms.
-- Drops stop at roofs and the ground: each new drop gets one `DynamicWorld::ray` from 50 m above it down to where
-  its lifetime would end (`ParticleFx::clipLife` hook, called from `PfxBucket::init`). The lifetime ends at the
+  density scaled with the weight. It stays on indoors, so rain outside is visible from caves and houses.
+- Drops stop at roofs and the ground: each new drop gets one `DynamicWorld::ray` from above the top of the world
+  mesh (at least 50 m above the drop) down to where its lifetime would end (`ParticleFx::clipLife` hook, called from `PfxBucket::init`). The lifetime ends at the
   first hit; drops whose ray hits above their spawn point (born under a roof) are not spawned. Measured with a
   temporary counter: from the benchmark camera above the city about 16 % of drops are shortened and almost none
-  skipped; inside Xardas' tower 22 % are skipped and 15 % shortened. Benchmark FPS unchanged (76).
+  skipped; inside Xardas' tower 22 % are skipped and 15 % shortened; at two waypoints inside the CITYFOREST cave
+  all drops are skipped. Benchmark FPS unchanged (76). The ray starts above the world mesh because a start point
+  only 50 m above the drop can lie inside the rock above a deep cave; back faces are filtered, so such a ray would
+  miss the mountain surface and let drops into the cave. That case was reasoned about, not observed.
   The hit points are where splashes would go; no splashes yet.
 - Lighting: `shader/lighting/sky_exposure.comp` dims direct sun (-80%) and ambient (-40%) by the rain weight
   after exposure is computed, the same way the cloud factor is applied, so the scene gets darker instead of the
