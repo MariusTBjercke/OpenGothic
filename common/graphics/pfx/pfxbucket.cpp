@@ -369,6 +369,12 @@ void PfxBucket::init(PfxBucket::Block& block, ImplEmitter& emitter, size_t parti
     float velocity = randf(decl.velAvg,decl.velVar);
     p.dir = p.dir*velocity/l;
     }
+
+  if(decl.clipLife!=nullptr) {
+    const Vec3 at = decl.useEmittersFOR ? p.pos+emitter.pos : p.pos;
+    p.life    = decl.clipLife(at,p.dir,p.life);
+    p.maxLife = std::max<uint16_t>(p.life,1);
+    }
   }
 
 void PfxBucket::finalize(size_t particle) {

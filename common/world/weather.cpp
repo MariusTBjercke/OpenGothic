@@ -20,8 +20,31 @@ static const float DropLifetime  = 1500.f;
 static const float MaxDropsPps   = MaxDrops*1000.f/DropLifetime;
 static const float AheadOfCamera = 1250.f;
 
+// the shelter ray of a new drop starts this far above it, so drops born under a roof are skipped too
+static const float ShelterRayUp  = 5000.f;
+
 static float rand01() {
   return float(std::rand())/float(RAND_MAX);
+  }
+
+// ParticleFx::clipLife for drops: end each drop where it hits the static world (roofs, ground, trees)
+static uint16_t clipDrop(const Tempest::Vec3& pos, const Tempest::Vec3& dir, uint16_t life) {
+  auto  world = Gothic::inst().world();
+  auto  phys  = world!=nullptr ? world->physic() : nullptr;
+  const float speed = dir.length();
+  if(phys==nullptr || speed<=0.f)
+    return life;
+
+  const float fall = speed*float(life);
+  const auto  up   = dir*(ShelterRayUp/speed);
+  const auto  hit  = phys->ray(pos-up, pos+dir*float(life));
+  if(!hit.hasCol)
+    return life;
+
+  const float dist = hit.hitFraction*(ShelterRayUp+fall) - ShelterRayUp;
+  if(dist<=0.f)
+    return 0; // under a roof already
+  return uint16_t(std::max(1.f, dist/speed));
   }
 
 Weather::Weather(World& owner)
@@ -202,6 +225,7 @@ ParticleFx& Weather::rainParticles() {
   src.use_emitters_for      = 0;
 
   fx.reset(new ParticleFx(src,"OG_WEATHER_RAIN"));
+  fx->clipLife = clipDrop;
   return *fx;
   }
 

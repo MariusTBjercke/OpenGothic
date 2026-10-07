@@ -95,6 +95,10 @@ class ParticleFx final {
     Tempest::Vec3 flyGravity;
     bool          flyCollDet = false;
 
+    // fork: called for each new particle with world position, velocity (per ms) and lifetime (ms); returns the
+    // lifetime to use, 0 skips the particle. Rain uses it to end drops at roofs and the ground.
+    uint16_t      (*clipLife)(const Tempest::Vec3& pos, const Tempest::Vec3& dir, uint16_t life) = nullptr;
+
     Material      visMaterial;
     Orientation   visOrientation        = Orientation::None;
     bool          visTexIsQuadPoly      = true;
