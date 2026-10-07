@@ -66,8 +66,10 @@ Keep these when merging upstream changes:
 
 - **Start theme stops on load.** `GAMESTART.WAV` (43 s main menu theme, a sound effect, not music) is stopped when a
   game starts loading (`Gothic::stopStartTheme` in `MainWindow::onStartLoading`) and skipped in benchmark mode.
-  Upstream keeps it playing into the level and declined changing that in issue #764, assuming vanilla does the same;
-  the user's Steam Gothic II stops it when a save starts loading.
+  Upstream keeps it playing into the level and declined changing that in issue #764, assuming vanilla does the same.
+  Vanilla does not: `zCMenu::Enter` (0x004db780) plays GAMESTART once when the main menu first opens, and
+  `zCMenu::Leave` (0x004db910) releases that sound, which stops it as soon as the menu is left for a new game or a
+  load. Also observed in the user's Steam Gothic II.
 - **Rain** (`common/world/weather.*`), `-marvin` startup commands, and the Windows helper scripts in `scripts/`.
 
 ## Layout
