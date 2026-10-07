@@ -77,9 +77,10 @@ start "" Gothic2Notr.exe -g "$GothicPath" %*
 "@ | Set-Content -Encoding ascii (Join-Path $Dest "Play.bat")
 @"
 @echo off
-rem marvin mode on, windowed: F2 opens the console (e.g. zstartrain 0.5)
+rem same as Play.bat with marvin mode on: F2 opens the console (e.g. zstartrain 0.5)
+rem no -window here: that is a debug mode where the mouse is never captured for the camera
 cd /d "%~dp0"
-start "" Gothic2Notr.exe -g "$GothicPath" -devmode -window %*
+start "" Gothic2Notr.exe -g "$GothicPath" -devmode %*
 "@ | Set-Content -Encoding ascii (Join-Path $Dest "Play (devmode).bat")
 
 if($DesktopShortcut) {
