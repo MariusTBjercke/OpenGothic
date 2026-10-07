@@ -64,7 +64,7 @@ const char* materialTag(zenkit::MaterialGroup src) {
   }
 
 World::World(GameSession& game, std::string_view file, bool startup, std::function<void(int)> loadProgress)
-  :wname(std::move(file)), game(game), wsound(game,*this), wobj(*this) {
+  :wname(std::move(file)), game(game), wsound(game,*this), wobj(*this), wweather(*this) {
   const auto* entry = Resources::vdfsIndex().find(wname);
 
   if(entry == nullptr) {
@@ -183,6 +183,9 @@ void World::load(Serialize &fin) {
 
   wobj.load(fin);
   npcPlayer = wobj.findHero();
+
+  if(fin.setEntry("worlds/",wname,"/weather"))
+    wweather.load(fin);
   }
 
 void World::save(Serialize &fout) {
@@ -195,6 +198,9 @@ void World::save(Serialize &fout) {
     }
 
   wobj.save(fout);
+
+  fout.setEntry("worlds/",wname,"/weather");
+  wweather.save(fout);
   }
 
 uint32_t World::npcId(const Npc *ptr) const {
@@ -380,6 +386,7 @@ void World::tick(uint64_t dt) {
   wdynamic->tick(dt);
   if(auto pl = player())
     wsound.tick(*pl);
+  wweather.tick(dt);
   globFx->tick(dt);
   }
 

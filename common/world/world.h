@@ -15,6 +15,7 @@
 #include "physics/dynamicworld.h"
 #include "worldobjects.h"
 #include "worldsound.h"
+#include "weather.h"
 #include "waypoint.h"
 #include "waymatrix.h"
 
@@ -78,6 +79,7 @@ class World final {
 
     WorldView*           view()     const { return wview.get();    }
     WorldSound*          sound()          { return &wsound;        }
+    Weather&             weather()        { return wweather;       }
     DynamicWorld*        physic()   const { return wdynamic.get(); }
     GlobalEffects*       globalFx() const { return globFx.get();   }
 
@@ -218,6 +220,7 @@ class World final {
     WorldSound                            wsound;
     WorldObjects                          wobj;
     std::unique_ptr<Npc>                  lvlInspector;
+    Weather                               wweather;
 
     auto         roomAt(const zenkit::BspNode &node) -> std::string_view;
     auto         portalAt(std::string_view tag) -> BspSector*;

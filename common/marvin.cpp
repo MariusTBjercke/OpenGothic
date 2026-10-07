@@ -119,7 +119,8 @@ Marvin::Marvin() {
     {"toggle wayboxes",            C_Invalid},
     {"toggle waynet",              C_Invalid},
     {"version",                    C_Invalid},
-    {"zstartrain",                 C_Invalid},
+    {"zstartrain %f",              C_ZStartRain},
+    {"zstartrain",                 C_ZStartRain},
     {"zstartsnow",                 C_Invalid},
     {"ztimer multiplyer %f",       C_TimeMultiplyer},
     {"ztimer realtime",            C_TimeRealtime},
@@ -419,6 +420,17 @@ bool Marvin::exec(std::string_view v) {
         return false;
       const TriggerEvent evt(std::string(ret.argv[0]),"",world->tickCount(),TriggerEvent::T_Trigger);
       world->triggerEvent(evt);
+      return true;
+      }
+    case C_ZStartRain: {
+      World* world = Gothic::inst().world();
+      if(world==nullptr)
+        return false;
+      float position = 0;
+      if(!ret.argv[0].empty() && !fromString(ret.argv[0], position))
+        return false;
+      world->weather().startRain(position);
+      print("started rain");
       return true;
       }
     case C_ZUntrigger: {
