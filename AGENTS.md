@@ -66,7 +66,7 @@ if a change should also go upstream, keep it self-contained so it can be cherry-
 | `shader/`           | GLSL shaders, compiled to SPIR-V at build time and embedded in the binary. |
 | `lib/`              | Dependencies. Submodules: `Tempest`, `ZenKit`, `bullet3`, `dmusic`, `TinySoundFont`, `rapidjson`. Vendored: `edd-dbg`, `miniz`. |
 | `linux/`, `packaging/` | Debian packaging, Nix flake, AppStream metadata. |
-| `scripts/`          | `Gothic2Notr.bat` launcher copied next to the Windows build. |
+| `scripts/`          | `Gothic2Notr.bat` launcher copied next to the Windows build; `build-windows.ps1` (fork-only) MSVC build helper. |
 
 ### Inside `common/`
 
@@ -125,8 +125,25 @@ cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build --target Gothic2Notr Spacer -j
 ```
 
-Output goes to `build/opengothic/`. On Windows, CI uses MSYS2 MinGW64 + Ninja; MSVC also works
-(Visual Studio opens the folder via `CMakeSettings.json`, output under `out/`).
+Output goes to `build/opengothic/`.
+
+### Windows (MSVC)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/build-windows.ps1            # RelWithDebInfo, Gothic2Notr + Spacer
+powershell -ExecutionPolicy Bypass -File scripts/build-windows.ps1 -Clean -Target Gothic2Notr
+```
+
+The script imports the MSVC x64 environment via `vswhere`, re-reads `PATH` from the registry (so tools
+installed with winget in the same session are found), checks for `cmake`/`ninja`/`glslangValidator`
+and initializes submodules if needed. A clean build is ~1100 steps.
+
+Requirements: Visual Studio with the C++ workload, CMake, Ninja, Vulkan SDK, and
+**Windows SDK 10.0.26100 or newer**. With older SDKs (for example 10.0.22621) the Tempest DX12
+backend fails with `D3D12_BARRIER_SYNC_CLEAR_UNORDERED_ACCESS_VIEW: undeclared identifier`.
+DX12 cannot simply be switched off with `-DTEMPEST_BUILD_DIRECTX12=OFF` under MSVC, because
+`game/main.cpp` references `Tempest::DirectX12Api` whenever `_MSC_VER` is defined.
+Upstream CI builds Windows with MSYS2 MinGW64 (no DX12), so MSVC-only breakage can go unnoticed there.
 
 Gotchas:
 - On non-MSVC compilers the engine is built with `-Wall -Wconversion -Werror`. Implicit narrowing
@@ -148,7 +165,13 @@ build/opengothic/Gothic2Notr -g "<path>" -window -devmode        # windowed, mar
 ```
 
 Runtime files are written to the working directory: `log.txt`, `crash.log`, `Gothic.ini`, saves.
-When diagnosing a crash, read `log.txt` and `crash.log` first.
+When diagnosing a crash, read `log.txt` and `crash.log` first. `log.txt` is locked while the game runs;
+stop the process before reading it on Windows.
+
+Smoke test (no test suite exists): start with `-nomenu -window`, let it run ~30 s, kill it, then check that
+there is no `crash.log` and that `log.txt` shows the world loading (GPU name, NPC spawns).
+Expected noise in `log.txt`, not regressions: `unable to load archive` for Union DLLs / zipped VDFs in
+`Data/`, `not implemented call [...]`, `invalid spawnpoint`, `Accessing member "C_NPC.AIVAR" without an instance set`.
 
 ## Code style
 
