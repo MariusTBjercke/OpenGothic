@@ -5,6 +5,7 @@
 #include <cctype>
 
 #include "utils/string_frm.h"
+#include "utils/fileutil.h"
 #include "world/objects/npc.h"
 #include "world/objects/item.h"
 #include "world/triggers/abstracttrigger.h"
@@ -106,8 +107,8 @@ Marvin::Marvin() {
     // game
     {"LC1",                        C_Invalid},
     {"LC2",                        C_Invalid},
-    {"load game",                  C_Invalid},
-    {"save game",                  C_Invalid},
+    {"load game",                  C_LoadGame},
+    {"save game",                  C_SaveGame},
     {"save zen",                   C_Invalid},
     {"set time %d %d",             C_SetTime},
     {"spawnmass %d",               C_Invalid},
@@ -383,6 +384,20 @@ bool Marvin::exec(std::string_view v) {
         return true;
         }
       return false;
+      }
+    case C_SaveGame: {
+      // the original console always uses savegame slot 1 (its help text says slot 0)
+      if(Gothic::inst().gameSession()==nullptr)
+        return false;
+      Gothic::inst().save("save_slot_1.sav","Console save");
+      print("saving game in slot 1");
+      return true;
+      }
+    case C_LoadGame: {
+      if(!FileUtil::exists(u"save_slot_1.sav"))
+        return false;
+      Gothic::inst().load("save_slot_1.sav");
+      return true;
       }
     case C_CamAutoswitch:
       return true;

@@ -36,6 +36,8 @@ class Marvin {
       C_ToggleTime,
       C_TimeMultiplyer,
       C_TimeRealtime,
+      C_SaveGame,
+      C_LoadGame,
       // npc
       C_CheatFull,
       C_CheatGod,
