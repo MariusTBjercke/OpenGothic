@@ -103,6 +103,10 @@ CommandLine::CommandLine(int argc, const char** argv) {
     else if(arg=="-nomenu") {
       noMenu = true;
       }
+    else if(arg=="-novideo") {
+      // skip videos started by scripts (intro); for automated runs
+      noVideo = true;
+      }
     else if(arg=="-benchmark") {
       isBenchmark = Benchmark::Normal;
       if(i+1<argc && argv[i+1][0]!='-') {

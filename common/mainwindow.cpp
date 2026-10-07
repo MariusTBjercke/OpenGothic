@@ -1121,7 +1121,7 @@ void MainWindow::saveGame(std::string_view slot, std::string_view name) {
   }
 
 void MainWindow::onVideo(std::string_view fname) {
-  if(Gothic::inst().isBenchmarkMode())
+  if(Gothic::inst().isBenchmarkMode() || !CommandLine::inst().doPlayVideos())
     return;
   video.pushVideo(fname);
   }

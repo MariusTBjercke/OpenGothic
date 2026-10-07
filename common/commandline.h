@@ -50,6 +50,7 @@ class CommandLine {
     bool                aaPreset()         const { return aaPresetId;   }
     std::string_view    defaultSave()      const { return saveDef;    }
     auto                startupMarvinCmds() const -> const std::vector<std::string>& { return marvinCmd; }
+    bool                doPlayVideos()     const { return !noVideo;     }
 
     std::string         wrldDef;
 
@@ -64,6 +65,7 @@ class CommandLine {
     std::vector<std::string> marvinCmd;
     bool                devmode      = false;
     bool                noMenu       = false;
+    bool                noVideo      = false;
     Benchmark           isBenchmark  = Benchmark::None;
     bool                isWindow     = false;
     bool                isDebug      = false;
