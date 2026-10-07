@@ -48,6 +48,7 @@ public static class SmokeWin {
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
   [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+  [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint flags);
 }
 "@
     }
@@ -63,7 +64,13 @@ public static class SmokeWin {
     [SmokeWin]::GetWindowRect($h, [ref]$r) | Out-Null
     $bmp = New-Object System.Drawing.Bitmap ($r.R - $r.L), ($r.B - $r.T)
     $g   = [System.Drawing.Graphics]::FromImage($bmp)
-    $g.CopyFromScreen($r.L, $r.T, 0, 0, $bmp.Size)
+    # PW_RENDERFULLCONTENT (2) reads the window's own content, also when it is covered by other windows
+    $hdc = $g.GetHdc()
+    $ok  = [SmokeWin]::PrintWindow($h, $hdc, 2)
+    $g.ReleaseHdc($hdc)
+    if(-not $ok) {
+      $g.CopyFromScreen($r.L, $r.T, 0, 0, $bmp.Size)
+      }
     $file = Join-Path $Dir ("shot_{0:D2}s.png" -f $t)
     $bmp.Save($file, [System.Drawing.Imaging.ImageFormat]::Png)
     $g.Dispose(); $bmp.Dispose()
