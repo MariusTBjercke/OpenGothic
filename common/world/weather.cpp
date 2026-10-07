@@ -20,7 +20,8 @@ static const float DropLifetime  = 1500.f;
 static const float MaxDropsPps   = MaxDrops*1000.f/DropLifetime;
 static const float AheadOfCamera = 1250.f;
 
-// the shelter ray of a new drop starts this far above it, so drops born under a roof are skipped too
+// the shelter ray of a new drop starts above the world mesh (at least this far above the drop), so drops born
+// under a roof or in a cave deep inside a mountain are skipped too
 static const float ShelterRayUp  = 5000.f;
 
 static float rand01() {
@@ -31,17 +32,22 @@ static float rand01() {
 static uint16_t clipDrop(const Tempest::Vec3& pos, const Tempest::Vec3& dir, uint16_t life) {
   auto  world = Gothic::inst().world();
   auto  phys  = world!=nullptr ? world->physic() : nullptr;
+  auto  view  = world!=nullptr ? world->view()   : nullptr;
   const float speed = dir.length();
-  if(phys==nullptr || speed<=0.f)
+  if(phys==nullptr || view==nullptr || speed<=0.f)
     return life;
 
   const float fall = speed*float(life);
-  const auto  up   = dir*(ShelterRayUp/speed);
-  const auto  hit  = phys->ray(pos-up, pos+dir*float(life));
+  const auto  n    = dir/speed;
+  float       back = ShelterRayUp;
+  if(n.y<0.f)
+    back = std::max(back, (view->bbox().second.y + 100.f - pos.y)/(-n.y));
+
+  const auto  hit  = phys->ray(pos-n*back, pos+dir*float(life));
   if(!hit.hasCol)
     return life;
 
-  const float dist = hit.hitFraction*(ShelterRayUp+fall) - ShelterRayUp;
+  const float dist = hit.hitFraction*(back+fall) - back;
   if(dist<=0.f)
     return 0; // under a roof already
   return uint16_t(std::max(1.f, dist/speed));
@@ -142,11 +148,12 @@ std::string Weather::statusLine() const {
   }
 
 void Weather::tickFx(uint64_t dt) {
-  const auto lp = owner.gameSession().camera().listenerPosition();
-  sheltered     = isSheltered(lp.pos);
+  auto&      camera = owner.gameSession().camera();
+  const auto lp     = camera.listenerPosition();
+  sheltered         = isSheltered(lp.pos);
 
-  // sound: follows the rain weight with a fixed slope, quieter when sheltered
-  const float target = weight*(sheltered ? 0.25f : 1.f);
+  // sound: follows the rain weight with a fixed slope, quieter indoors and under water (as the original)
+  const float target = weight*(sheltered || camera.isInWater() ? 0.25f : 1.f);
   const float step   = 0.0005f*float(dt);
   if(sndVolume<target)
     sndVolume = std::min(target, sndVolume+step); else
@@ -170,9 +177,10 @@ void Weather::tickFx(uint64_t dt) {
     sound = Tempest::SoundEffect();
     }
 
-  // drops: box of particles in front of the camera, density scaled by weight
+  // drops: box of particles in front of the camera, density scaled by weight. They stay on indoors, so rain
+  // can be seen from inside a cave or house; drops under cover are skipped per drop (clipDrop)
   auto& fx = rainParticles();
-  if(weight>0.f && !sheltered) {
+  if(weight>0.f) {
     if(drops.isEmpty()) {
       fx.ppsValue = MaxDropsPps; // bucket sizes itself on creation
       drops = PfxEmitter(owner,&fx);
