@@ -80,6 +80,8 @@ class Camera final {
     bool isFirstPerson() const;
 
     void setLookBack(bool lb);
+    void setLookAround(bool la);
+    bool isLookAround() const;
 
     void toggleDebug();
 
@@ -157,6 +159,7 @@ class Camera final {
     bool                  tgEnable      = true;
     bool                  fpEnable      = false;
     bool                  lbEnable      = false;
+    bool                  laEnable      = false;
     bool                  inertiaTarget = true;
     Mode                  camMod        = Normal;
     MarvinMode            camMarvinMod  = M_Normal;

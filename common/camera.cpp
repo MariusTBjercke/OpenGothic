@@ -292,6 +292,14 @@ void Camera::setLookBack(bool lb) {
   lbEnable = lb;
   }
 
+void Camera::setLookAround(bool la) {
+  laEnable = la;
+  }
+
+bool Camera::isLookAround() const {
+  return laEnable;
+  }
+
 void Camera::toggleDebug() {
   dbg = !dbg;
   }
@@ -529,6 +537,8 @@ const zenkit::ICamera& Camera::cameraDef() const {
   auto& camd = Gothic::cameraDef();
   if(camMod==Dialog)
     return camd.dialogCam();
+  if(laEnable)
+    return camd.lookCam();
   if(lbEnable)
     return camd.backCam();
   if(fpEnable && (camMod==Normal || camMod==Melee))
@@ -711,10 +721,11 @@ void Camera::tick(uint64_t dt) {
 
   const float dtF = float(dt)/1000.f;
 
-  {
+  if(!laEnable) {
+    // look-around keeps the current distance; CAMMODLOOK has different range limits
     const auto& def = cameraDef();
     state.range = def.min_range + (def.max_range-def.min_range)*userRange;
-  }
+    }
 
   // normalize angles in -180..180 range, for convinience
   // dst.spin = angleMod(dst.spin);
@@ -954,6 +965,12 @@ Vec3 Camera::clampRotation(Tempest::Vec3 spin) {
   float       minElev = -60;
   float       maxAzim = +180;
   float       minAzim = -180;
+  if(laEnable) {
+    // look-around orbits the camera around the standing player, within CAMMODLOOK azimuth
+    const auto& def = cameraDef();
+    maxAzim = def.max_azimuth;
+    minAzim = def.min_azimuth;
+    }
 
   const auto pl = Gothic::inst().player();
   if(pl==nullptr)

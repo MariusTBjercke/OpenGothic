@@ -964,7 +964,7 @@ void MainWindow::tickCamera(uint64_t dt) {
     else if(inventory.isActive()) {
       camera.setTarget(pos);
       }
-    else if(player.focus().npc!=nullptr && meleeFocus && pl!=nullptr) {
+    else if(player.focus().npc!=nullptr && meleeFocus && pl!=nullptr && !camera.isLookAround()) {
       auto spin = camera.spin();
       spin.y = pl->rotation();
       camera.setSpin(spin);
@@ -972,7 +972,7 @@ void MainWindow::tickCamera(uint64_t dt) {
       }
     else if(pl!=nullptr && !camera.isFree()) {
       auto spin = camera.spin();
-      if(pl->interactive()==nullptr && !pl->isDown())
+      if(pl->interactive()==nullptr && !pl->isDown() && !camera.isLookAround())
         spin.y = pl->rotation();
       if(pl->isDive() && !camera.isMarvin())
         spin.x = -pl->rotationY();

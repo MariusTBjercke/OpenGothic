@@ -11,6 +11,7 @@ class CameraDefinitions final {
     const zenkit::ICamera& stdCam()       const { return camModNormal; }
     const zenkit::ICamera& fpCam()        const { return camModFp;     }
     const zenkit::ICamera& backCam()      const { return camModBack;   }
+    const zenkit::ICamera& lookCam()      const { return camModLook;   }
     const zenkit::ICamera& meleeCam()     const { return camModMelee;  }
     const zenkit::ICamera& rangeCam()     const { return camModRange;  }
     const zenkit::ICamera& mageCam()      const { return camModMage;   }
@@ -26,7 +27,7 @@ class CameraDefinitions final {
     std::vector<std::pair<std::string, zenkit::ICamera>> cameras;
     const zenkit::ICamera* find(std::string_view name) const;
 
-    zenkit::ICamera camModNormal, camModFp, camModBack;
+    zenkit::ICamera camModNormal, camModFp, camModBack, camModLook;
     zenkit::ICamera camModDialog, camModInventory, camModDeath, camModSwim, camModDive, camModFall;
     zenkit::ICamera camModMelee, camModRange, camModMage;
   };

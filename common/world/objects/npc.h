@@ -125,6 +125,7 @@ class Npc final {
     auto       centerPosition() const -> Tempest::Vec3;
     auto       collosionCenter() const -> Tempest::Vec3;
     Npc*       lookAtTarget() const;
+    bool       turnHead(Tempest::Vec2 dst, uint64_t dt);
     auto       portalName() -> std::string_view;
     auto       formerPortalName() -> std::string_view;
 

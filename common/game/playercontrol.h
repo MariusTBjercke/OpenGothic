@@ -146,6 +146,8 @@ class PlayerControl final {
     float          rotMouse=0;
     float          rotMouseY=0;
     bool           casting = false;
+    bool           lookAround = false;
+    bool           headTurned = false;
     size_t         pickLockProgress = 0;
 
     float          runAngleDest   = 0.f;
@@ -169,6 +171,8 @@ class PlayerControl final {
     void           clrDraw();
     void           implMove(uint64_t dt);
     void           implMoveMobsi(Npc& pl, uint64_t dt);
+    bool           canLookAround(Npc& pl) const;
+    void           tickHead(Npc& pl, uint64_t dt);
     void           processPickLock(Npc& pl, Interactive& inter, KeyCodec::Action key);
     void           processLadder(Npc& pl, Interactive& inter, KeyCodec::Action key);
     void           quitPicklock(Npc& pl);
