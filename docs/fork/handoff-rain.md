@@ -7,7 +7,7 @@ Status as of 2026-10-08 (third session). Written for the next agent picking this
 
 - Branch: **`feat/rain`**, **not merged into `master` yet**. The user is play-testing it; merge when they say so
   (fast-forward or merge commit, then push `master`).
-- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@8a27a348` (see `BUILD.txt` there).
+- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@62f9635d` (see `BUILD.txt` there; the play build was made from `ea2b8bce`, same content).
   It holds the user's real saves; never use it as a working directory for automated runs. `save game` typed in the
   console there overwrites `save_slot_1.sav`, the first menu slot.
 
@@ -44,6 +44,7 @@ Commits on the branch, oldest first (all self-contained, see `git log master..fe
 | `b220c4e1` | no sun halo behind the overcast: Mie phase blends to isotropic with coverage (user report) |
 | `89df09c5` | splashes on water: drops ending under a water surface end on it (`DynamicWorld::waterRay`) |
 | `8a27a348` | overcast shaped by `SKYRAINCLOUDS.TGA` (two layers, normalized to its average) (user: too few clouds) |
+| `62f9635d` | no bright flash after sunset in rain: exposure sees the sky behind the overcast, dusk band darkened |
 | docs commits | `AGENTS.md`, research notes, this file |
 
 ## What works (verified)
@@ -117,6 +118,9 @@ Looking out of a cave (`ff6b424f`) was confirmed by the user in play.
   (pine branches face up). Keep it faint, scale it with the overcast (`rainCover`) and skip alpha tested pixels
   (G-buffer hint bit 2). Test "wet, then rain stopped": save while it rains, load with `-LoadSave` (wetness starts
   at the rain weight) and run `zstartrain 1`.
+- **Auto exposure at dusk** relies on the bright sky glow around the set sun (sunset 21:33, `Sky::updateLight`) to
+  keep the scene dark until night. Anything that hides that glow (the overcast) makes dusk flash bright. Measure
+  with a sweep of `set time 21 30` ... `21 50`, dry and rain, at one waypoint (mean screenshot brightness).
 - **Hiding the sun disc is not enough under the overcast**: the forward Mie lobe of the atmosphere LUTs draws a
   bright halo where the sun is, and the rain haze (more Mie) makes it stronger. `miePhaseRain` blends the phase
   to isotropic with the coverage; use it wherever `miePhase` feeds visible sky or fog.
