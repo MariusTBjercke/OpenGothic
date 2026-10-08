@@ -7,7 +7,7 @@ Status as of 2026-10-08 (third session). Written for the next agent picking this
 
 - Branch: **`feat/rain`**, **not merged into `master` yet**. The user is play-testing it; merge when they say so
   (fast-forward or merge commit, then push `master`).
-- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@cb281256` (see `BUILD.txt` there).
+- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@89df09c5` (see `BUILD.txt` there).
   It holds the user's real saves; never use it as a working directory for automated runs. `save game` typed in the
   console there overwrites `save_slot_1.sav`, the first menu slot.
 
@@ -41,6 +41,8 @@ Commits on the branch, oldest first (all self-contained, see `git log master..fe
 | `4147b855` | soft wet edges (9 taps, 1.2 m), map 128 m traced once with new cells first (user: hard edges, pop-in) |
 | `28bfda58` | `wait <ms>` in `-marvin` startup commands |
 | `cb281256` | wetness on the game clock (5 min wet, 45 min dry, stepped through sleep), saved in `worlds/<zen>/wetness` |
+| `b220c4e1` | no sun halo behind the overcast: Mie phase blends to isotropic with coverage (user report) |
+| `89df09c5` | splashes on water: drops ending under a water surface end on it (`DynamicWorld::waterRay`) |
 | docs commits | `AGENTS.md`, research notes, this file |
 
 ## What works (verified)
@@ -114,6 +116,11 @@ Looking out of a cave (`ff6b424f`) was confirmed by the user in play.
   (pine branches face up). Keep it faint, scale it with the overcast (`rainCover`) and skip alpha tested pixels
   (G-buffer hint bit 2). Test "wet, then rain stopped": save while it rains, load with `-LoadSave` (wetness starts
   at the rain weight) and run `zstartrain 1`.
+- **Hiding the sun disc is not enough under the overcast**: the forward Mie lobe of the atmosphere LUTs draws a
+  bright halo where the sun is, and the rain haze (more Mie) makes it stronger. `miePhaseRain` blends the phase
+  to isotropic with the coverage; use it wherever `miePhase` feeds visible sky or fog.
+- **Water is not in `DynamicWorld::ray`**; `waterRay(point, 0)` casts up from a point and returns the absolute
+  water surface height in `wdepth` (despite the name) when the point is under water.
 - **Anything per pixel in the sky must not depend on the view azimuth near the zenith**: samples that follow the
   view direction (as `applyClouds` does for the dry cloud highlight) form a cross when looking straight up.
 - **`-marvin` commands run in one frame**, before the next world tick, so state that changes on tick (weight,

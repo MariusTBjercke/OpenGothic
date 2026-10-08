@@ -151,7 +151,7 @@ Implemented in `common/world/weather.{h,cpp}` (class `Weather`, owned by `World`
 - Splashes: `clipDrop` puts each landing (position, world tick when it lands) into a queue; a second emitter
   (`SKYRAINSPLASH.TGA`, additive billboards 6 to 12 cm, alpha 130, 200 ms) takes the due landings in its
   `spawnHook`, so a splash appears where and when a drop disappears: on ground, roofs and barrels, never indoors.
-  About 275 splashes/s at full rain at the harbour.
+  About 275 splashes/s at full rain at the harbour. Drops that end under a water surface end and splash on it.
 - Wind: the drop direction is tilted by a slowly varying wind in the original's strength range times
   `zRainWindScale` (read from `[SKY_OUTDOOR]`, default 0.003). Not linked to the vegetation wind in the renderer.
 - Overcast: `SceneDesc.rain` (set via `WorldView::setRainWeight`) drives the sky shaders with the original's
