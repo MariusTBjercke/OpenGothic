@@ -44,6 +44,12 @@ float rainCover(float rain) {
   return min(rain*2.0, 1.0);
   }
 
+// fork: under the overcast light is scattered evenly; the strong forward Mie lobe drew a bright halo where the
+// hidden sun is
+float miePhaseRain(float cosTheta, float rain) {
+  return mix(miePhase(cosTheta), 1.0/(4.0*M_PI), rainCover(rain));
+  }
+
 // fork: cloud amount for the atmosphere model while it rains: more haze (Mie), less blue (Rayleigh)
 float rainClouds(float clouds, float rain) {
   return max(clouds, mix(clouds, 0.6, rainCover(rain)));

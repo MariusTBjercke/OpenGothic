@@ -163,7 +163,7 @@ vec3 _raymarchScattering(ivec2 pix, const uint sliceId, vec3 pos, vec3 rayDir, v
   const float noise         = hashF(pix)/numScatteringSteps;
   //const float noise         = interleavedGradientNoise(gl_GlobalInvocationID.xy)/numScatteringSteps;
 
-  const float phaseMie      = miePhase(cosTheta);
+  const float phaseMie      = miePhaseRain(cosTheta, scene.rain);
   const float phaseRayleigh = rayleighPhase(-cosTheta);
   const float clouds        = rainClouds(textureLod(cloudsLUT, vec2(scene.isNight,0), 0).a, scene.rain);
 
@@ -223,7 +223,7 @@ vec3 raymarchScattering(ivec2 pix, const uint sliceId, vec3 pos, vec3 rayDir, ve
   const float   dZ     = linearDepth(z,       scene.clipInfo);
 
   const float cosTheta      = dot(rayDir, sunDir);
-  const float phaseMie      = miePhase(cosTheta);
+  const float phaseMie      = miePhaseRain(cosTheta, scene.rain);
   const float phaseRayleigh = rayleighPhase(-cosTheta);
   const float clouds        = rainClouds(textureLod(cloudsLUT, vec2(scene.isNight,0), 0).a, scene.rain);
 

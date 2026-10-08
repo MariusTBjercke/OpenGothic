@@ -86,7 +86,7 @@ vec3 applyClouds(vec3 skyColor, in sampler2D skyLUT, vec3 plPos, vec3 sunDir, ve
                       dayL1,dayL0, nightL1,nightL0);
   vec3 ret   = skyColor + cloud.rgb * cloud.a;
   if(rain>0.0)
-    ret = mix(ret, rainOvercast((plPos + view*L)*0.01, skyLUT, plPos, sunDir, dxy0, dayL0), rainCover(rain)*0.95);
+    ret = mix(ret, rainOvercast((plPos + view*L)*0.01, skyLUT, plPos, sunDir, dxy0, dayL0), rainCover(rain));
   return ret;
   // return mix(skyColor, cloud.rgb, cloud.a);
   }

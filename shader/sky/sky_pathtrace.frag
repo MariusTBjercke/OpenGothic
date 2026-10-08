@@ -63,7 +63,7 @@ vec4 raymarchScattering(vec3 pos, vec3 rayDir, vec3 sunDir, float tMax, vec3 smP
   const float cosTheta      = dot(rayDir, sunDir);
   const float noise         = interleavedGradientNoise()/numScatteringSteps;
 
-  const float phaseMie      = miePhase(cosTheta);
+  const float phaseMie      = miePhaseRain(cosTheta, scene.rain);
   const float phaseRayleigh = rayleighPhase(-cosTheta);
   const float clouds        = rainClouds(textureLod(cloudsLUT, vec2(scene.isNight,0), 0).a, scene.rain);
 
