@@ -9,6 +9,9 @@
 #include <Tempest/Application>
 #include <Tempest/Log>
 
+#include <algorithm>
+#include <cstdlib>
+
 #include "ui/dialogmenu.h"
 #include "ui/menuroot.h"
 #include "ui/stacklayout.h"
@@ -1166,7 +1169,14 @@ void MainWindow::onWorldLoaded() {
   player.clearFocus();
   }
 
-void MainWindow::runStartupMarvinCmds() {
+bool MainWindow::runStartupMarvinCmds() {
+  // runs the -marvin commands; 'wait <ms>' (startup only) delays the rest by that much real time.
+  // Returns true once all commands ran
+  static size_t   next   = 0;
+  static uint64_t resume = 0;
+  if(Application::tickCount()<resume)
+    return false;
+
   // command output goes to log.txt, so automated runs can read it
   struct Output {
     void print(std::string_view msg) { Log::i("marvin output: ",msg); }
@@ -1174,10 +1184,19 @@ void MainWindow::runStartupMarvinCmds() {
   Output out;
   Marvin marvin;
   marvin.print.bind(&out,&Output::print);
-  for(auto& cmd:CommandLine::inst().startupMarvinCmds()) {
+
+  auto& cmds = CommandLine::inst().startupMarvinCmds();
+  while(next<cmds.size()) {
+    const std::string& cmd = cmds[next++];
+    if(cmd.rfind("wait ",0)==0) {
+      resume = Application::tickCount() + uint64_t(std::max(0, std::atoi(cmd.c_str()+5)));
+      Log::i("marvin: \"",cmd,"\"");
+      return false;
+      }
     const bool ok = marvin.exec(cmd);
     Log::i("marvin: \"",cmd,"\"",(ok ? "" : " failed"));
     }
+  return true;
   }
 
 void MainWindow::onSessionExit() {
@@ -1299,8 +1318,7 @@ void MainWindow::render(){
     static bool startupCmds = !CommandLine::inst().startupMarvinCmds().empty();
     if(T_UNLIKELY(startupCmds) && Gothic::inst().worldView()!=nullptr && !video.isActive() &&
        Gothic::inst().checkLoading()==Gothic::LoadState::Idle) {
-      startupCmds = false;
-      runStartupMarvinCmds();
+      startupCmds = !runStartupMarvinCmds();
       }
 
     auto t = Application::tickCount();
