@@ -7,7 +7,7 @@ Status as of 2026-10-08 (third session). Written for the next agent picking this
 
 - Branch: **`feat/rain`**, **not merged into `master` yet**. The user is play-testing it; merge when they say so
   (fast-forward or merge commit, then push `master`).
-- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@4147b855` (see `BUILD.txt` there).
+- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@cb281256` (see `BUILD.txt` there).
   It holds the user's real saves; never use it as a working directory for automated runs. `save game` typed in the
   console there overwrites `save_slot_1.sav`, the first menu slot.
 
@@ -39,6 +39,8 @@ Commits on the branch, oldest first (all self-contained, see `git log master..fe
 | `e8580156` | wet surfaces: rain height map, darker albedo after the G-buffer, sky sheen after the lights |
 | `b24f5c52` | sheen faint (0.15), only under the overcast, not on foliage; darker wet albedo (user: looked like ice) |
 | `4147b855` | soft wet edges (9 taps, 1.2 m), map 128 m traced once with new cells first (user: hard edges, pop-in) |
+| `28bfda58` | `wait <ms>` in `-marvin` startup commands |
+| `cb281256` | wetness on the game clock (5 min wet, 45 min dry, stepped through sleep), saved in `worlds/<zen>/wetness` |
 | docs commits | `AGENTS.md`, research notes, this file |
 
 ## What works (verified)
@@ -114,6 +116,8 @@ Looking out of a cave (`ff6b424f`) was confirmed by the user in play.
   at the rain weight) and run `zstartrain 1`.
 - **Anything per pixel in the sky must not depend on the view azimuth near the zenith**: samples that follow the
   view direction (as `applyClouds` does for the dry cloud highlight) form a cross when looking straight up.
+- **`-marvin` commands run in one frame**, before the next world tick, so state that changes on tick (weight,
+  wetness) is stale in a `weather` right after `set time` or `zstartrain`. Put `wait 2000;` in between.
 - **Script videos block `-marvin`**: startup commands wait for a drawn world frame, and a new game plays the intro
   first. The smoke test passes `-novideo`; without it an idle run on a new game never ran its commands.
 - **Screenshots**: `-ScreenshotAt` uses `PrintWindow(PW_RENDERFULLCONTENT)`. The benchmark camera path is close to

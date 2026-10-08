@@ -134,7 +134,9 @@ Keep these when merging upstream changes:
 - **Run console commands at startup** (fork): `-marvin "set time 13 0;zstartrain 0.5"` executes `;`-separated
   marvin commands after the first frame that drew the world (`MainWindow::runStartupMarvinCmds`, called from
   `render`) and logs `marvin: "<cmd>"` or `marvin: "<cmd>" failed`; what a command prints is logged as
-  `marvin output: ...`. Works without `-devmode`. Running them earlier, in `onWorldLoaded`, crashed `save game`:
+  `marvin output: ...`. Works without `-devmode`. `wait <ms>` in that list (startup only) delays the remaining
+  commands, e.g. `"zstartrain 0.5;wait 30000;save game"`; the commands are otherwise all run in one frame, before
+  the next world tick. Running them earlier, in `onWorldLoaded`, crashed `save game`:
   its screenshot is drawn before the renderer had drawn the world once.
 - **Console save/load**: `save game` / `load game` use `save_slot_1.sav` like the original console (slot 1, not
   the quick save slot 0). `weather` (fork) prints today's rain window, weight and shelter state.
