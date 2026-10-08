@@ -62,12 +62,24 @@ static uint16_t clipDrop(Tempest::Vec3& pos, const Tempest::Vec3& dir, uint16_t 
     back = std::max(back, (view->bbox().second.y + 100.f - pos.y)/(-n.y));
 
   const auto  hit  = phys->ray(pos-n*back, pos+dir*float(life));
-  if(!hit.hasCol)
-    return life;
+  float       dist = fall;
+  if(hit.hasCol) {
+    dist = hit.hitFraction*(back+fall) - back;
+    if(dist<=0.f)
+      return 0; // under a roof already
+    }
 
-  const float dist = hit.hitFraction*(back+fall) - back;
-  if(dist<=0.f)
-    return 0; // under a roof already
+  // water is not in the ray above: if the drop ends under a water surface, it ends (and splashes) on the surface
+  if(n.y<0.f) {
+    const auto wtr = phys->waterRay(pos + n*dist, 0.f);
+    if(wtr.hasCol && wtr.wdepth<pos.y) {
+      const float toWater = (pos.y - wtr.wdepth)/(-n.y);
+      if(toWater<dist)
+        dist = toWater;
+      }
+    }
+  if(dist>=fall)
+    return life;
 
   const auto ret = uint16_t(std::max(1.f, dist/speed));
   if(pendingHits.size()<MaxPendingHits)
