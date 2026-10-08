@@ -7,7 +7,7 @@ Status as of 2026-10-08 (third session). Written for the next agent picking this
 
 - Branch: **`feat/rain`**, **not merged into `master` yet**. The user is play-testing it; merge when they say so
   (fast-forward or merge commit, then push `master`).
-- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@1947b281` (see `BUILD.txt` there).
+- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@97ad8db0` (see `BUILD.txt` there).
   It holds the user's real saves; never use it as a working directory for automated runs. `save game` typed in the
   console there overwrites `save_slot_1.sav`, the first menu slot.
 
@@ -34,6 +34,7 @@ Commits on the branch, oldest first (all self-contained, see `git log master..fe
 | `8e07daec` | splashes where rain lands (second emitter, `ParticleFx::spawnHook` replaces `clipLife`) |
 | `54163a1f` | drops tilted by a varying wind (`zRainWindScale`) |
 | `1947b281` | indoor check for the muffled sound: roof ray plus portal room or walls on three sides |
+| `97ad8db0` | overcast darker (0.3 of horizon radiance) and without the cross at the zenith (user reports) |
 | docs commits | `AGENTS.md`, research notes, this file |
 
 ## What works (verified)
@@ -96,6 +97,14 @@ Looking out of a cave (`ff6b424f`) was confirmed by the user in play.
   returning 0. A particle with `life == 0` that was counted would never be freed.
 - **`World::roomAt` gives false positives** (e.g. `TURMOST02`, `MATTEO`) when the camera is above roofs next to a
   portal room, which lowers the sound. It also scans all BSP sectors per call. It no longer switches drops off.
+- **The overcast lights the scene**: the sky irradiance (ambient) is computed from the sky view LUT including the
+  overcast layer, while auto exposure is still set by the dry sun. A bright overcast made rain scenes brighter than
+  dry ones in shade (user report). Tune `RainOvercastBrightness` in `shader/sky/clouds.glsl` against measured
+  screenshots: same waypoint dry and rain (`-Marvin "cheat god;set time 13 0;[zstartrain 0.5;]goto waypoint X"`,
+  idle, shot at 14 s) and compare mean brightness. `cheat god` keeps the hero alive near monsters; dense forest
+  waypoints can put the camera inside foliage. `NW_CITY_TO_FARM2_05` and `NW_CITY_HABOUR_05` give usable views.
+- **Anything per pixel in the sky must not depend on the view azimuth near the zenith**: samples that follow the
+  view direction (as `applyClouds` does for the dry cloud highlight) form a cross when looking straight up.
 - **Script videos block `-marvin`**: startup commands wait for a drawn world frame, and a new game plays the intro
   first. The smoke test passes `-novideo`; without it an idle run on a new game never ran its commands.
 - **Screenshots**: `-ScreenshotAt` uses `PrintWindow(PW_RENDERFULLCONTENT)`. The benchmark camera path is close to
