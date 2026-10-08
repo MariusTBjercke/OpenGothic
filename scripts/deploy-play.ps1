@@ -9,6 +9,8 @@
 #
 # Play folder: -Dest, else $env:OPENGOTHIC_PLAY_DIR, else "OpenGothic-play" next to the Gothic installation.
 # Gothic path: -GothicPath, else $env:OPENGOTHIC_GOTHIC_PATH (also read from the user registry env).
+# -GraphicsArgs: extra game flags put into every launcher (default "-aa 2": CMAA2 anti-aliasing, high preset,
+# costs next to nothing on an RTX 5070 Ti). Pass -GraphicsArgs "" for none.
 
 param(
   [string]$GothicPath = $env:OPENGOTHIC_GOTHIC_PATH,
@@ -16,7 +18,8 @@ param(
   [string]$BuildDir = "build",
   [switch]$SkipBuild,
   [switch]$SkipSmoke,
-  [switch]$DesktopShortcut
+  [switch]$DesktopShortcut,
+  [string]$GraphicsArgs = "-aa 2"
 )
 
 $ErrorActionPreference = "Stop"
@@ -73,14 +76,14 @@ $dirty  = if(git status --porcelain --untracked-files=no) { " (with uncommitted 
 @"
 @echo off
 cd /d "%~dp0"
-start "" Gothic2Notr.exe -g "$GothicPath" %*
+start "" Gothic2Notr.exe -g "$GothicPath" $GraphicsArgs %*
 "@ | Set-Content -Encoding ascii (Join-Path $Dest "Play.bat")
 @"
 @echo off
 rem same as Play.bat with marvin mode on: F2 opens the console (e.g. zstartrain 0.5)
 rem no -window here: that is a debug mode where the mouse is never captured for the camera
 cd /d "%~dp0"
-start "" Gothic2Notr.exe -g "$GothicPath" -devmode %*
+start "" Gothic2Notr.exe -g "$GothicPath" -devmode $GraphicsArgs %*
 "@ | Set-Content -Encoding ascii (Join-Path $Dest "Play (devmode).bat")
 
 # Script Patch (scripts only, its Union plugins do not apply), if its ini is installed in the Gothic folder.
@@ -96,7 +99,7 @@ Get-ChildItem (Join-Path $GothicPath "system") -Filter "g2a_nr_scriptpatch_*.ini
 rem Gothic II Script Patch scripts; saves and Gothic.ini live in ScriptPatch\
 if not exist "%~dp0ScriptPatch" mkdir "%~dp0ScriptPatch"
 cd /d "%~dp0ScriptPatch"
-start "" "%~dp0Gothic2Notr.exe" -g "$GothicPath" -game:$($_.Name)$($v.Args) %*
+start "" "%~dp0Gothic2Notr.exe" -g "$GothicPath" -game:$($_.Name)$($v.Args) $GraphicsArgs %*
 "@ | Set-Content -Encoding ascii (Join-Path $Dest $v.Name)
       }
   }
