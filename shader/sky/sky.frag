@@ -23,6 +23,7 @@ layout(binding = 6) uniform sampler2D textureDayL0;
 layout(binding = 7) uniform sampler2D textureDayL1;
 layout(binding = 8) uniform sampler2D textureNightL0;
 layout(binding = 9) uniform sampler2D textureNightL1;
+layout(binding = 10) uniform sampler2D textureRain; // fork: SKYRAINCLOUDS.TGA
 
 layout(location = 0) out vec4 outColor;
 
@@ -92,7 +93,7 @@ vec3 applyClouds(vec3 skyColor) {
   vec3  viewDir  = normalize(pos1);
   return applyClouds(skyColor, skyLUT, plPos, scene.sunDir, viewDir, night,
                      scene.cloudsDir.xy, scene.cloudsDir.zw,
-                     textureDayL1,textureDayL0, textureNightL1,textureNightL0, scene.rain);
+                     textureDayL1,textureDayL0, textureNightL1,textureNightL0, textureRain, scene.rain);
   }
 
 void main() {

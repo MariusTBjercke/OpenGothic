@@ -537,6 +537,7 @@ void Renderer::prepareSky(Tempest::Encoder<Tempest::CommandBuffer>& cmd, WorldVi
   cmd.setBinding(3, *wview.sky().cloudsDay()  .lay[1], Sampler::trillinear());
   cmd.setBinding(4, *wview.sky().cloudsNight().lay[0], Sampler::trillinear());
   cmd.setBinding(5, *wview.sky().cloudsNight().lay[1], Sampler::trillinear());
+  cmd.setBinding(6, wview.sky().cloudsRain(), Sampler::trillinear());
   cmd.setPushData(&sz, sizeof(sz));
   cmd.setPipeline(shaders.skyViewCldLut);
   cmd.draw(nullptr, 0, 3);
@@ -1945,6 +1946,7 @@ void Renderer::drawSky(Encoder<CommandBuffer>& cmd, const WorldView& wview) {
   cmd.setBinding(7, *wview.sky().cloudsDay()  .lay[1], Sampler::trillinear());
   cmd.setBinding(8, *wview.sky().cloudsNight().lay[0], Sampler::trillinear());
   cmd.setBinding(9, *wview.sky().cloudsNight().lay[1], Sampler::trillinear());
+  cmd.setBinding(10, wview.sky().cloudsRain(), Sampler::trillinear());
   cmd.setPipeline(skyShader);
   cmd.draw(nullptr, 0, 3);
   }

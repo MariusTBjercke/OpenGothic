@@ -31,6 +31,7 @@ class Sky final {
 
     const State&              cloudsDay()   const { return clouds[0]; }
     const State&              cloudsNight() const { return clouds[1]; }
+    const Tempest::Texture2d& cloudsRain()  const { return *rainImg; } // fork: SKYRAINCLOUDS.TGA
     Tempest::Vec2             cloudsOffset(int layer, uint64_t tickCount) const;
     float                     isNight() const;
 
@@ -45,6 +46,7 @@ class Sky final {
 
     const Tempest::Texture2d*     sunImg   = &Resources::fallbackBlack();
     const Tempest::Texture2d*     moonImg  = &Resources::fallbackBlack();
+    const Tempest::Texture2d*     rainImg  = &Resources::fallbackBlack();
 
     float                         GSunIntensity  = 0;
     float                         GMoonIntensity = 0;

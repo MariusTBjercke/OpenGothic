@@ -70,6 +70,11 @@ Sky::Sky(std::string_view wname) {
     sunImg = &Resources::fallbackBlack();
   if(moonImg==nullptr)
     moonImg = &Resources::fallbackBlack();
+
+  // fork: rain cloud layer of the original (zCSkyLayer::RenderRainCloudLayer)
+  rainImg = Resources::loadTexture("SKYRAINCLOUDS.TGA", true);
+  if(rainImg==nullptr || rainImg==&Resources::fallbackTexture())
+    rainImg = &Resources::fallbackBlack();
   }
 
 Sky::~Sky() {
