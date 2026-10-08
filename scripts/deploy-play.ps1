@@ -83,6 +83,19 @@ cd /d "%~dp0"
 start "" Gothic2Notr.exe -g "$GothicPath" -devmode %*
 "@ | Set-Content -Encoding ascii (Join-Path $Dest "Play (devmode).bat")
 
+# Script Patch (scripts only, its Union plugins do not apply), if its ini is installed in the Gothic folder.
+# Saves of patched scripts must not mix with vanilla ones, so it runs in its own working directory.
+Get-ChildItem (Join-Path $GothicPath "system") -Filter "g2a_nr_scriptpatch_*.ini" -ErrorAction SilentlyContinue |
+  ForEach-Object {
+@"
+@echo off
+rem Gothic II Script Patch scripts; saves and Gothic.ini live in ScriptPatch\
+if not exist "%~dp0ScriptPatch" mkdir "%~dp0ScriptPatch"
+cd /d "%~dp0ScriptPatch"
+start "" "%~dp0Gothic2Notr.exe" -g "$GothicPath" -game:$($_.Name) %*
+"@ | Set-Content -Encoding ascii (Join-Path $Dest "Play (Script Patch).bat")
+  }
+
 if($DesktopShortcut) {
   $desktop = [Environment]::GetFolderPath("Desktop")
   $sh  = New-Object -ComObject WScript.Shell
