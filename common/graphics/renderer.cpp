@@ -1764,8 +1764,10 @@ void Renderer::drawRainWetness(Encoder<CommandBuffer>& cmd, uint8_t fId, const W
   cmd.setBinding(1, gbufNormal, Sampler::nearest());
   cmd.setBinding(2, zbuffer,    Sampler::nearest());
   cmd.setBinding(3, buf);
-  if(sheen)
+  if(sheen) {
     cmd.setBinding(4, sky.viewCldLut, sky.sampler);
+    cmd.setBinding(5, gbufDiffuse, Sampler::nearest());
+    }
   cmd.setPushData(&push, sizeof(push));
   cmd.setPipeline(sheen ? shaders.rainSheen : shaders.rainWet);
   cmd.draw(nullptr, 0, 3);

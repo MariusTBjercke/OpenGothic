@@ -31,6 +31,7 @@ layout(binding = 3, std430) readonly buffer RainMap {
   };
 #if defined(SHEEN)
 layout(binding = 4) uniform sampler2D skyLUT;
+layout(binding = 5) uniform sampler2D gbufDiffuse;
 #endif
 
 layout(location = 0) out vec4 outColor;
@@ -76,8 +77,13 @@ void main() {
   const float facing  = mix(0.35, 1.0, clamp(normal.y, 0.0, 1.0));
 
 #if defined(SHEEN)
-  // a thin water film: only on surfaces facing up, reflecting the sky with the Fresnel term of water
-  const float film = push.wetness * exposed * smoothstep(0.5, 0.9, normal.y);
+  // a thin water film: only on surfaces facing up, reflecting the sky with the Fresnel term of water.
+  // Faint, and only under the overcast: a strong one or one reflecting the clear sky after rain looks like ice.
+  // Not on alpha tested materials (foliage, grass), where it looked like snow
+  const int   hints = int(texelFetch(gbufDiffuse, fragCoord, 0).a*255.0 + 0.5);
+  if((hints & (1 << 2))!=0)
+    discard;
+  const float film = push.wetness * exposed * smoothstep(0.6, 0.95, normal.y) * rainCover(scene.rain);
   if(film<=0.001)
     discard;
   const vec3  view = normalize(pos - scene.camPos);
@@ -86,11 +92,11 @@ void main() {
   refl   = normalize(refl);
   const float fr  = fresnel(refl, normal, IorWater);
   const vec3  sky = textureSkyLUT(skyLUT, vec3(0,RPlanet,0), refl, scene.sunDir) * scene.GSunIntensity * scene.exposure;
-  outColor = vec4(sky * fr * film * 0.6, 0.0);
+  outColor = vec4(sky * min(fr, 0.5) * film * 0.15, 0.0);
 #else
-  // gbuffer albedo is gamma encoded: 0.3 here is about half the linear albedo
+  // gbuffer albedo is gamma encoded: 0.35 here is a bit more than half the linear albedo
   const float k = push.wetness * exposed * facing;
-  const float f = 1.0 - 0.3*k;
+  const float f = 1.0 - 0.35*k;
   outColor = vec4(f, f, f, 1.0);
 #endif
   }
