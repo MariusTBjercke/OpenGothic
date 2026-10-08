@@ -329,16 +329,23 @@ void Weather::tickWetness(const Tempest::Vec3& camera, uint64_t dt) {
     map.oz     = oz;
     }
 
-  // trace a few cells per tick: straight down from above the world mesh, the first hit is where rain lands
-  const float top = view->bbox().second.y + 100.f;
-  for(int i=0; i<256; ++i) {
-    const size_t  id = (mapNext++)%size_t(n*n);
+  // trace cells that are not traced yet: straight down from above the world mesh, the first hit is where rain
+  // lands. The world is static, so each cell is traced once; new cells at the edge (camera moved) get done first
+  // instead of showing up dry for a while
+  const float  top    = view->bbox().second.y + 100.f;
+  const size_t cells  = size_t(n*n);
+  int          budget = 512;
+  for(size_t i=0; i<cells && budget>0; ++i) {
+    const size_t id = (mapNext++)%cells;
+    if(map.height[id]!=Unknown)
+      continue;
     const int32_t x  = int32_t(id%size_t(n));
     const int32_t z  = int32_t(id/size_t(n));
     const float   wx = (float(map.ox + x) + 0.5f)*RainMapCell;
     const float   wz = (float(map.oz + z) + 0.5f)*RainMapCell;
     const auto    hit = phys->ray(Tempest::Vec3(wx,top,wz), Tempest::Vec3(wx,camera.y-5000.f,wz));
     map.height[id] = hit.hasCol ? hit.v.y : Open;
+    --budget;
     }
   }
 

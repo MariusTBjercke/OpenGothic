@@ -60,6 +60,28 @@ float topHeight(vec2 xz) {
   return cellHeight(ivec2(floor(at + 0.5)));
   }
 
+// 0 = covered (below the topmost surface), 1 = reached by rain
+float exposure(vec3 pos) {
+  // up to 40 cm below the top surface still counts as reached (cell size, slopes); fully dry 1 m below it
+  const float top = topHeight(pos.xz);
+  return smoothstep(top-100.0, top-40.0, pos.y);
+  }
+
+// averaged over a circle of about 1.2 m, so the edge of a roof or an overhang fades over a couple of meters
+float softExposure(vec3 pos) {
+  const float R = 120.0;
+  float sum = exposure(pos);
+  sum += exposure(pos + vec3( R,      0, 0     ));
+  sum += exposure(pos + vec3(-R,      0, 0     ));
+  sum += exposure(pos + vec3( 0,      0, R     ));
+  sum += exposure(pos + vec3( 0,      0,-R     ));
+  sum += exposure(pos + vec3( R*0.7,  0, R*0.7 ));
+  sum += exposure(pos + vec3(-R*0.7,  0, R*0.7 ));
+  sum += exposure(pos + vec3( R*0.7,  0,-R*0.7 ));
+  sum += exposure(pos + vec3(-R*0.7,  0,-R*0.7 ));
+  return sum/9.0;
+  }
+
 void main() {
   const ivec2 fragCoord = ivec2(gl_FragCoord.xy);
   const float d         = texelFetch(depth, fragCoord, 0).r;
@@ -71,9 +93,7 @@ void main() {
   const vec3  pos    = pos4.xyz/pos4.w;
   const vec3  normal = normalFetch(gbufNormal, fragCoord);
 
-  // up to 40 cm below the top surface still counts as reached (cell size, slopes); fully dry 1 m below it
-  const float top     = topHeight(pos.xz);
-  const float exposed = smoothstep(top-100.0, top-40.0, pos.y);
+  const float exposed = softExposure(pos);
   const float facing  = mix(0.35, 1.0, clamp(normal.y, 0.0, 1.0));
 
 #if defined(SHEEN)
@@ -92,11 +112,11 @@ void main() {
   refl   = normalize(refl);
   const float fr  = fresnel(refl, normal, IorWater);
   const vec3  sky = textureSkyLUT(skyLUT, vec3(0,RPlanet,0), refl, scene.sunDir) * scene.GSunIntensity * scene.exposure;
-  outColor = vec4(sky * min(fr, 0.5) * film * 0.15, 0.0);
+  outColor = vec4(sky * min(fr, 0.5) * film * 0.12, 0.0);
 #else
-  // gbuffer albedo is gamma encoded: 0.35 here is a bit more than half the linear albedo
+  // gbuffer albedo is gamma encoded: 0.3 here is about half the linear albedo
   const float k = push.wetness * exposed * facing;
-  const float f = 1.0 - 0.35*k;
+  const float f = 1.0 - 0.3*k;
   outColor = vec4(f, f, f, 1.0);
 #endif
   }

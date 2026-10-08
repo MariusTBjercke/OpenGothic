@@ -38,7 +38,7 @@ class Weather final {
       int32_t            ox = 0, oz = 0;  // cell index of the (0,0) corner
       std::vector<float> height;          // size*size; Unknown = not traced yet, Open = nothing hit
       };
-    static constexpr int32_t RainMapSize = 64;
+    static constexpr int32_t RainMapSize = 128;
     static constexpr float   RainMapCell = 100.f;
     static constexpr float   Unknown     = 1e8f;
     static constexpr float   Open        = -1e8f;
@@ -85,5 +85,5 @@ class Weather final {
 
     float         wet         = 0.f;
     RainMap       map;
-    size_t        mapNext     = 0;
+    size_t        mapNext     = 0; // scan position for cells not traced yet
   };
