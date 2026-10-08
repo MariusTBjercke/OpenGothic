@@ -44,8 +44,13 @@ vec4 clouds(vec3 at, float nightPhase, vec3 highlight,
   return color;
   }
 
-// fork: rain overcast, a grey layer lit by the average sky radiance; the day cloud texture adds variation
-vec3 rainOvercast(vec3 at, vec3 lum, vec2 dxy, in sampler2D dayL0) {
+// fork: brightness of the rain overcast relative to the average horizon sky radiance. The overcast also feeds the
+// sky irradiance (ambient light), so it decides how bright the scene gets in rain
+const float RainOvercastBrightness = 0.3;
+
+// fork: rain overcast, a grey layer lit by the average horizon sky radiance; the day cloud texture adds variation.
+// The radiance is sampled in fixed directions: samples that follow the view direction form a cross at the zenith
+vec3 rainOvercast(vec3 at, in sampler2D skyLUT, vec3 plPos, vec3 sunDir, vec2 dxy, in sampler2D dayL0) {
   vec3  cloudsAt = normalize(at);
   vec2  texc     = 2000.0*vec2(atan(cloudsAt.z,cloudsAt.y), atan(cloudsAt.x,cloudsAt.y));
 #if defined(SKY_LOD)
@@ -53,7 +58,12 @@ vec3 rainOvercast(vec3 at, vec3 lum, vec2 dxy, in sampler2D dayL0) {
 #else
   float detail   = texture(dayL0, texc*0.15 + dxy).a;
 #endif
-  float grey     = dot(lum*0.25, vec3(0.2125, 0.7154, 0.0721));
+  vec3  lum      = vec3(0);
+  lum += textureSkyLUT(skyLUT, plPos, vec3( 1,0, 0), sunDir);
+  lum += textureSkyLUT(skyLUT, plPos, vec3(-1,0, 0), sunDir);
+  lum += textureSkyLUT(skyLUT, plPos, vec3( 0,0, 1), sunDir);
+  lum += textureSkyLUT(skyLUT, plPos, vec3( 0,0,-1), sunDir);
+  float grey     = dot(lum*0.25, vec3(0.2125, 0.7154, 0.0721)) * RainOvercastBrightness;
   return vec3(grey) * (1.0 - 0.45*detail);
   }
 
@@ -76,7 +86,7 @@ vec3 applyClouds(vec3 skyColor, in sampler2D skyLUT, vec3 plPos, vec3 sunDir, ve
                       dayL1,dayL0, nightL1,nightL0);
   vec3 ret   = skyColor + cloud.rgb * cloud.a;
   if(rain>0.0)
-    ret = mix(ret, rainOvercast((plPos + view*L)*0.01, lum, dxy0, dayL0), rainCover(rain)*0.95);
+    ret = mix(ret, rainOvercast((plPos + view*L)*0.01, skyLUT, plPos, sunDir, dxy0, dayL0), rainCover(rain)*0.95);
   return ret;
   // return mix(skyColor, cloud.rgb, cloud.a);
   }
