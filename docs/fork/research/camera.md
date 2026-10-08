@@ -38,7 +38,39 @@ Source functions (Ghidra names, image base 0x400000):
 - Both position and rotation move toward the result with interpolation (slerp for rotation), so the
   switch is not instant on screen.
 
+## Position easing (how fast the camera follows)
+
+`zCMovementTracker` (0x004b87c0, and `Update` at 0x004b73f0) moves the camera from its current position toward
+the ideal position in two steps per frame. `dt` is the frame time in seconds (`ztimer` frame time divided by the
+motion factor). `frac` below is the distance from current to ideal position divided by 500, clamped to 0..1.
+
+1. **Lerp** toward the ideal position with factor `rate * dt`, clamped to 0..1. With line of sight to the player,
+   outside first person and without the look-around key held:
+   - most modes: `rate = 2 * veloTrans` (veloTrans below 10 is raised toward 10 with `frac`);
+   - `CAMMODMELEE` (and one more mode): `rate = 2 * (veloTrans + 20 * frac)`.
+   - First person or look-around key held: `rate = veloTrans * mouseSensX * (0.3 + 0.7 * frac)`, where the
+     sensitivity is `mouseSensitivity * 0.5 + 0.3` from `Gothic.ini` (`[GAME]`).
+   - Without line of sight: `rate = 3 * (veloTrans + (min(veloTrans + 10, 30) - veloTrans) * frac)`.
+2. **Weighted average** of the old position and the step-1 result: `new = (old + step1 * k) / (1 + k)` with
+   `k = dt / 0.05 * (4e + 1) / (e + 1)`, `e = |step1 - old|^2 * 1e-5` (0.05 comes from an int field = 2,
+   times 0.025). Small moves get `k = 20 * dt`, large ones up to four times that.
+
+Camera definitions: `CAMMODNORMAL` uses the prototype's `veloTrans = 40`, `veloRot = 2`.
+
+At 60 fps and veloTrans 40, step 1 is a full snap and step 2 moves 25 % of the way for small offsets and up to
+57 % for large ones (about 17 to 50 per second). The result depends on frame rate: at 144 fps it drops to
+about 10 per second for small offsets.
+
+The look-at target is the player position without smoothing (`UpdatePlayerPos` stores it directly).
+
+Mouse turning of the player (`oCAIHuman::PC_Turnings`, contains 0x0069a9ad) scales mouse X by
+`zMouseRotationScale` (default 2.0) and turns the model directly through the animation controller.
+
 ## OpenGothic differences (as of 2026-10-08)
+
+- `Camera::followTrans` used a single lerp at `0.25 * veloTrans` per second (10 per second for the normal
+  camera, about 100 ms lag), so turning with the mouse felt delayed. Changed to the two-step vanilla factor,
+  evaluated at 60 fps and applied as a frame-rate independent rate.
 
 - `Camera::tickThirdPerson` (`common/camera.cpp`) also switches to elevation 80 and range 150 below 80
   units, but then looks **at the target**, i.e. straight down at the player. Combined with mouse-driven
