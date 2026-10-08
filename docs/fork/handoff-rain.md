@@ -148,8 +148,9 @@ Looking out of a cave (`ff6b424f`) was confirmed by the user in play.
 
 ## Suggested next steps (in order)
 
-1. **Check the CI run of the merge** (push to `master`). The user decided to keep all jobs, Linux included; the
-   earlier Linux hang was a GitHub mirror problem. The fork is public, so Actions minutes are free.
+1. **Check the CI run of the merge**: dispatched by hand on `master` (run 37813568549), because a push to `master`
+   does not start the workflow in this fork. The user decided to keep all jobs, Linux included; the earlier Linux
+   hang was a GitHub mirror problem. The fork is public, so Actions minutes are free.
    Sunrise (about 04:45) has not been checked for a flash like the one fixed at dusk.
 2. **Tuning from user feedback**: wet darkening (0.3) and sheen (0.12) in `shader/lighting/rain_wet.frag`, wetting
    and drying times in `Weather::tickWetness`, overcast brightness (`rainOvercast` in `shader/sky/clouds.glsl`), haze amount
@@ -167,8 +168,9 @@ Looking out of a cave (`ff6b424f`) was confirmed by the user in play.
 - Conversation in Norwegian; repository docs and commits in English, Conventional Commits. Commits on this branch
   carry no co-author trailer.
 - **Don't dispatch CI after every change.** The user is mostly testing for themselves; run CI when a version is
-  close to done. A push to `master` runs it anyway (`gh workflow run Build ... --ref feat/rain` exists for the
-  rest). Verify locally with the MSVC build and the smoke test meanwhile.
+  close to done, e.g. after a merge: `gh workflow run Build -R MariusTBjercke/OpenGothic --ref master`. A push to
+  `master` does not start it in this fork (Actions are enabled, but no push run ever appeared). Verify locally
+  with the MSVC build and the smoke test meanwhile.
 - Isolated fork: no issues/PRs/comments upstream (see `AGENTS.md`).
 - The user play-tests via `scripts/deploy-play.ps1` and gives quick feedback (they watch smoke-test windows too).
   Prefer visible/readable effects over strict realism (asked for brighter drops).
