@@ -370,9 +370,10 @@ void PfxBucket::init(PfxBucket::Block& block, ImplEmitter& emitter, size_t parti
     p.dir = p.dir*velocity/l;
     }
 
-  if(decl.clipLife!=nullptr) {
-    const Vec3 at = decl.useEmittersFOR ? p.pos+emitter.pos : p.pos;
-    p.life    = decl.clipLife(at,p.dir,p.life);
+  if(decl.spawnHook!=nullptr) {
+    Vec3 at   = decl.useEmittersFOR ? p.pos+emitter.pos : p.pos;
+    p.life    = decl.spawnHook(at,p.dir,p.life);
+    p.pos     = decl.useEmittersFOR ? at-emitter.pos : at;
     p.maxLife = std::max<uint16_t>(p.life,1);
     }
   }

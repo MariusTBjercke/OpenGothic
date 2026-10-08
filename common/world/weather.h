@@ -44,6 +44,7 @@ class Weather final {
     bool  isSheltered(const Tempest::Vec3& pos) const;
 
     static ParticleFx& rainParticles();
+    static ParticleFx& splashParticles();
 
     World&        owner;
     bool          enabled     = true;
@@ -61,4 +62,5 @@ class Weather final {
     float         sndBase     = 1.f;
     Tempest::SoundEffect sound;
     PfxEmitter    drops;
+    PfxEmitter    splashes;
   };

@@ -95,9 +95,10 @@ class ParticleFx final {
     Tempest::Vec3 flyGravity;
     bool          flyCollDet = false;
 
-    // fork: called for each new particle with world position, velocity (per ms) and lifetime (ms); returns the
-    // lifetime to use, 0 skips the particle. Rain uses it to end drops at roofs and the ground.
-    uint16_t      (*clipLife)(const Tempest::Vec3& pos, const Tempest::Vec3& dir, uint16_t life) = nullptr;
+    // fork: called for each new particle with world position, velocity (per ms) and lifetime (ms); may move the
+    // particle and returns the lifetime to use, 0 skips it. Rain uses it to end drops at roofs and the ground and to
+    // put splashes where rain lands.
+    uint16_t      (*spawnHook)(Tempest::Vec3& pos, const Tempest::Vec3& dir, uint16_t life) = nullptr;
 
     Material      visMaterial;
     Orientation   visOrientation        = Orientation::None;
