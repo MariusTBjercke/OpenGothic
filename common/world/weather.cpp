@@ -110,8 +110,12 @@ Weather::~Weather() {
   }
 
 float Weather::skyTime(gtime t) {
-  const double dayMs = 24.0*60.0*60.0*1000.0;
-  double       v     = double(t.timeInDay().toInt())/dayMs + 0.5;
+  return skyTimeMs(t.toInt());
+  }
+
+float Weather::skyTimeMs(int64_t ms) {
+  const int64_t dayMs = 24*60*60*1000;
+  double        v     = double(((ms%dayMs)+dayMs)%dayMs)/double(dayMs) + 0.5;
   if(v>=1.0)
     v -= 1.0;
   return float(v);
@@ -131,6 +135,7 @@ float Weather::rainWeightAt(float skyTime, float rainStart, float rainStop) {
 void Weather::tick(uint64_t dt) {
   if(!enabled) {
     weight = 0;
+    tickWetness();
     tickFx(dt);
     return;
     }
@@ -150,7 +155,40 @@ void Weather::tick(uint64_t dt) {
     rainActive = false;
     }
 
+  tickWetness();
   tickFx(dt);
+  }
+
+void Weather::tickWetness() {
+  // game time: wet after 5 game minutes of full rain, dry 45 game minutes after it stops (about 20 s and 3 min
+  // real time at the normal clock speed). Time jumps (sleeping) are stepped through minute by minute with the rain
+  // window of the day, so sleeping through rain leaves the ground as wet as the last hours were
+  static const float   WetUp   = 5.f;
+  static const float   WetDown = 45.f;
+  static const int64_t Minute  = 60*1000;
+
+  const int64_t now = owner.time().toInt();
+  if(lastWetTime<0 || now<lastWetTime || now-lastWetTime>7*24*60*Minute) {
+    lastWetTime = now;
+    return;
+    }
+
+  // no drying while it still rains, also not in the weak start and end of a rain window
+  auto step = [this](float w, float minutes) {
+    if(wet<w)
+      wet = std::min(w, wet + minutes/WetUp);
+    else if(w<=0.f)
+      wet = std::max(0.f, wet - minutes/WetDown);
+    };
+
+  int64_t t = lastWetTime;
+  while(now-t > Minute) {
+    t += Minute;
+    const float w = enabled ? rainWeightAt(skyTimeMs(t),rainStart,rainStop) : 0.f;
+    step(w, 1.f);
+    }
+  step(weight, float(now-t)/float(Minute));
+  lastWetTime = now;
   }
 
 void Weather::startRain(float position, float duration) {
@@ -209,8 +247,8 @@ std::string Weather::statusLine() const {
   const bool indoor = isSheltered(owner.gameSession().camera().listenerPosition().pos);
 
   char buf[128] = {};
-  std::snprintf(buf,sizeof(buf),"rain %02d:%02d-%02d:%02d, weight %.2f%s%s",
-                t0/60, t0%60, t1/60, t1%60, double(weight),
+  std::snprintf(buf,sizeof(buf),"rain %02d:%02d-%02d:%02d, weight %.2f, wet %.2f%s%s",
+                t0/60, t0%60, t1/60, t1%60, double(weight), double(wet),
                 isRaining() ? ", raining" : "", indoor ? ", sheltered" : "");
   return buf;
   }
@@ -229,7 +267,7 @@ void Weather::tickFx(uint64_t dt) {
   // overcast sky, haze and hidden sun in the sky/fog shaders (scene.rain)
   if(auto view = owner.view())
     view->setRainWeight(weight);
-  tickWetness(lp.pos, dt);
+  tickRainMap(lp.pos);
 
   // sound: follows the rain weight with a fixed slope, quieter indoors and under water (as the original)
   const float target = weight*(sheltered || camera.isInWater() ? 0.25f : 1.f);
@@ -292,12 +330,7 @@ void Weather::tickFx(uint64_t dt) {
     }
   }
 
-void Weather::tickWetness(const Tempest::Vec3& camera, uint64_t dt) {
-  // wet in about 20 s of full rain, dry about 3 minutes after it stops
-  const float target = weight;
-  if(wet<target)
-    wet = std::min(target, wet + float(dt)/20000.f); else
-    wet = std::max(target, wet - float(dt)/180000.f);
+void Weather::tickRainMap(const Tempest::Vec3& camera) {
   if(wet<=0.f)
     return;
 
@@ -442,4 +475,15 @@ void Weather::load(Serialize& fin) {
   fin.read(prevSkyTime,rainStart,rainStop,rainCtr,lightning,rainActive);
   weight = rainWeightAt(skyTime(owner.time()),rainStart,rainStop);
   wet    = weight;
+  lastWetTime = -1;
+  }
+
+void Weather::saveWetness(Serialize& fout) const {
+  fout.write(wet,uint64_t(lastWetTime));
+  }
+
+void Weather::loadWetness(Serialize& fin) {
+  uint64_t t = 0;
+  fin.read(wet,t);
+  lastWetTime = int64_t(t);
   }

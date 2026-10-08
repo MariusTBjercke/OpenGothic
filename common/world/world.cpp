@@ -186,6 +186,8 @@ void World::load(Serialize &fin) {
 
   if(fin.setEntry("worlds/",wname,"/weather"))
     wweather.load(fin);
+  if(fin.setEntry("worlds/",wname,"/wetness"))
+    wweather.loadWetness(fin);
   }
 
 void World::save(Serialize &fout) {
@@ -201,6 +203,8 @@ void World::save(Serialize &fout) {
 
   fout.setEntry("worlds/",wname,"/weather");
   wweather.save(fout);
+  fout.setEntry("worlds/",wname,"/wetness");
+  wweather.saveWetness(fout);
   }
 
 uint32_t World::npcId(const Npc *ptr) const {

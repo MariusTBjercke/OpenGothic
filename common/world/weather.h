@@ -47,16 +47,21 @@ class Weather final {
 
     void  save(Serialize& fout) const;
     void  load(Serialize& fin);
+    // separate optional save entry, so saves with only the 'weather' entry still load
+    void  saveWetness(Serialize& fout) const;
+    void  loadWetness(Serialize& fin);
 
     // pure helpers, sky time: 0 = noon, 0.5 = midnight
     static float skyTime(gtime t);
+    static float skyTimeMs(int64_t ms);
     static float rainWeightAt(float skyTime, float rainStart, float rainStop);
 
   private:
     void  rollRain();
     void  tickFx(uint64_t dt);
     void  tickWind(ParticleFx& fx, uint64_t dt);
-    void  tickWetness(const Tempest::Vec3& camera, uint64_t dt);
+    void  tickWetness();
+    void  tickRainMap(const Tempest::Vec3& camera);
     bool  isSheltered(const Tempest::Vec3& pos) const;
 
     static ParticleFx& rainParticles();
@@ -84,6 +89,7 @@ class Weather final {
     PfxEmitter    splashes;
 
     float         wet         = 0.f;
+    int64_t       lastWetTime = -1; // game time (ms) of the last wetness update
     RainMap       map;
     size_t        mapNext     = 0; // scan position for cells not traced yet
   };
