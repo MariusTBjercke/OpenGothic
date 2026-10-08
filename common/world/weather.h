@@ -59,6 +59,7 @@ class Weather final {
     bool          rainActive  = false;
 
     bool          sheltered   = false;
+    uint64_t      shelterTimer = 0;
     float         sndVolume   = 0.f;
     float         sndBase     = 1.f;
     float         windScale   = 0.003f; // [SKY_OUTDOOR] zRainWindScale

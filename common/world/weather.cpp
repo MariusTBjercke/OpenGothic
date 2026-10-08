@@ -152,8 +152,27 @@ void Weather::rollRain() {
   }
 
 bool Weather::isSheltered(const Tempest::Vec3& pos) const {
-  // portal rooms (houses, caves with portals) count as indoor
-  return !owner.roomAt(pos).empty();
+  // portal rooms (houses, caves with portals) count as indoor, like the camera location hint of the original.
+  // roomAt also reports a room when the camera is above a roof next to one, so a roof above is required too.
+  // Many houses are not portal rooms: there a low roof plus walls on at least three sides counts as well
+  auto phys = owner.physic();
+  if(phys==nullptr)
+    return !owner.roomAt(pos).empty();
+
+  const auto roof = phys->ray(pos, pos+Tempest::Vec3(0,5000,0));
+  if(!roof.hasCol)
+    return false;
+  if(!owner.roomAt(pos).empty())
+    return true;
+  if(roof.v.y-pos.y>1500.f)
+    return false;
+
+  static const Tempest::Vec3 side[4] = {{800,0,0}, {-800,0,0}, {0,0,800}, {0,0,-800}};
+  int walls = 0;
+  for(auto& s:side)
+    if(phys->ray(pos, pos+s).hasCol)
+      ++walls;
+  return walls>=3;
   }
 
 std::string Weather::statusLine() const {
@@ -168,17 +187,25 @@ std::string Weather::statusLine() const {
   const int t0 = clock(rainStart);
   const int t1 = clock(rainStop);
 
+  const bool indoor = isSheltered(owner.gameSession().camera().listenerPosition().pos);
+
   char buf[128] = {};
   std::snprintf(buf,sizeof(buf),"rain %02d:%02d-%02d:%02d, weight %.2f%s%s",
                 t0/60, t0%60, t1/60, t1%60, double(weight),
-                isRaining() ? ", raining" : "", sheltered ? ", sheltered" : "");
+                isRaining() ? ", raining" : "", indoor ? ", sheltered" : "");
   return buf;
   }
 
 void Weather::tickFx(uint64_t dt) {
   auto&      camera = owner.gameSession().camera();
   const auto lp     = camera.listenerPosition();
-  sheltered         = isSheltered(lp.pos);
+  if(shelterTimer<=dt) {
+    // roomAt scans all BSP sectors; a few checks per second are enough
+    sheltered    = isSheltered(lp.pos);
+    shelterTimer = 200;
+    } else {
+    shelterTimer -= dt;
+    }
 
   // overcast sky, haze and hidden sun in the sky/fog shaders (scene.rain)
   if(auto view = owner.view())
