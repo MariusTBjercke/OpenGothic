@@ -1,13 +1,13 @@
 # Handoff: rain (weather) in the OpenGothic fork
 
-Status as of 2026-10-07 (second session). Written for the next agent picking this up. Read `AGENTS.md` first, then
+Status as of 2026-10-08 (third session). Written for the next agent picking this up. Read `AGENTS.md` first, then
 `docs/fork/research/rain.md` (how the original engine does it, with Ghidra addresses).
 
 ## Where things are
 
 - Branch: **`feat/rain`**, **not merged into `master` yet**. The user is play-testing it; merge when they say so
   (fast-forward or merge commit, then push `master`).
-- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@ff6b424f` (see `BUILD.txt` there).
+- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@1947b281` (see `BUILD.txt` there).
   It holds the user's real saves; never use it as a working directory for automated runs. `save game` typed in the
   console there overwrites `save_slot_1.sav`, the first menu slot.
 
@@ -30,14 +30,23 @@ Commits on the branch, oldest first (all self-contained, see `git log master..fe
 | `2ccd4e65` | drops stop at roofs and the ground (one physics ray per new drop) |
 | `d63dbd0c`, `bcba6f14` | `-novideo` flag (skips script videos such as the intro); the smoke test passes it |
 | `ff6b424f` | drops stay on in portal rooms (rain visible from caves), shelter ray starts above the world mesh |
+| `0f5036f5` | overcast sky, haze and hidden sun/moon (`SceneDesc.rain`, sky/fog shaders) |
+| `8e07daec` | splashes where rain lands (second emitter, `ParticleFx::spawnHook` replaces `clipLife`) |
+| `54163a1f` | drops tilted by a varying wind (`zRainWindScale`) |
+| `1947b281` | indoor check for the muffled sound: roof ray plus portal room or walls on three sides |
 | docs commits | `AGENTS.md`, research notes, this file |
 
 ## What works (verified)
 
 - Logic matches vanilla: one random window per game day rolled at the noon wrap (not when sleeping over noon),
   weight ramp 20/60/20 %, `Wld_IsRaining` = weight > 0.3, `zstartrain [pos]` semantics, `skyEffects=0` disables.
-- Sound: `RAIN_01.WAV` loop owned by `Weather`, volume slope as vanilla, x0.25 inside portal rooms and under water.
-  User heard it.
+- Sound: `RAIN_01.WAV` loop owned by `Weather`, volume slope as vanilla, x0.25 indoors and under water.
+  User heard it. Indoor check verified with `weather` after loading saves made at `NW_CITY_HABOUR_HUT_03_IN`
+  (`sheltered`) and `NW_CITY_HABOUR_05` (not).
+- Overcast sky: benchmark screenshots at 13:00 (grey sky with darker cloud variation, hazy distance, water
+  reflects grey), 23:00 (stars gone, near black sky) and at half coverage. FPS unchanged (76).
+- Splashes on the harbour pavement and on barrels (`goto waypoint NW_CITY_HABOUR_05`), none inside the huts.
+- Wind: drops visibly slanted at the harbour.
 - Drops: world-space box emitter 12.5 m in front of the camera, ~1000 drops at full weight, additive. User saw them.
 - Drops end at the first static hit and are not spawned under roofs. Screenshot comparison in Xardas' tower (new
   game start, not a portal room): streaks inside before, none after. Counter numbers are in the research notes.
@@ -60,8 +69,10 @@ Commits on the branch, oldest first (all self-contained, see `git log master..fe
    `zstartrain 0.5`, then talk to an ambient NPC outdoors.
 2. **Drops at roofs from the ground**: the screenshots were taken inside the tower and from the high benchmark
    camera. Standing under a roof overhang or a market stall in the city has not been looked at.
-3. **Looking out of a cave** (the user's report that led to `ff6b424f`): rain outside should now be visible from
-   inside; only the automated runs above were done, and their camera ended up looking down at the hero.
+3. **The second batch in real play** (`0f5036f5` to `1947b281`): overcast sky, splashes, wind tilt and the
+   muffled sound in huts were checked with screenshots and the `weather` command only.
+
+Looking out of a cave (`ff6b424f`) was confirmed by the user in play.
 
 ## Gotchas learned the hard way
 
@@ -104,21 +115,18 @@ Commits on the branch, oldest first (all self-contained, see `git log master..fe
 ## Suggested next steps (in order)
 
 1. **Close the open checks** above, then merge `feat/rain` into `master` when the user says so, and redeploy the
-   play folder (`scripts/deploy-play.ps1`).
-2. **Splashes** with `SKYRAINSPLASH.TGA` at the hit points (vanilla does this). `clipDrop` already computes the
-   hit (`hit.v`) and the time of impact; a second emitter or a small list of timed splash positions fed from there
-   is the simplest route. `mrk*` fields are parsed but not implemented.
-3. **Better shelter detection** than `roomAt` for the x0.25 sound volume (its only remaining use): a short
-   upward physics ray from the camera (roof check), cached for a few frames; keep `roomAt` for portal rooms.
-4. **Grey overcast sky**: research `RenderRainCloudLayer` (0x005e5d00) for how much vanilla darkens and how
-   `SKYRAINCLOUDS.TGA` is blended, then add a rain term to the sky/cloud shaders (`shader/sky/*`) and some fog.
-   Renderer files change often upstream; keep the hook small (one push constant / scene field).
-5. **Wind tilt** from `[SKY_OUTDOOR] zRainWindScale` (0.003) and the sky's global wind; vanilla tilts the fall
-   direction only. `clipDrop` follows the drop direction, so it keeps working with tilted drops.
-6. **Unit tests for pure logic** (`Weather::skyTime`, `rainWeightAt`, window rolling): there is no test target,
+   play folder (`scripts/deploy-play.ps1`). The user has not asked for a merge yet.
+2. **Wet surfaces**: darker albedo and more specular on upward-facing outdoor surfaces with the rain weight (a
+   term in the G-buffer or lighting shaders, gated by `scene.rain`). Must not wet roofed areas; the drop/splash
+   rays cannot help there, so it probably needs a sky-visibility term (the renderer has cloud shadow / sky
+   occlusion data). Not in the original game.
+3. **Tuning from user feedback**: overcast brightness (`rainOvercast` in `shader/sky/clouds.glsl`), haze amount
+   (0.6 in `rainClouds`, `shader/sky/sky_common.glsl`), splash rate/size/alpha, drop count.
+4. **Lightning**: the flag is rolled and saved like the original, but G2 does not seem to render it (ZenKit marks
+   the save fields G1 only). Research before building anything.
+5. **Unit tests for pure logic** (`Weather::skyTime`, `rainWeightAt`, window rolling): there is no test target,
    but ZenKit vendors doctest (`lib/ZenKit/vendor/doctest`), usable for a small fork-only test executable.
-7. Optional `-nomusic` flag for quiet manual test sessions (music and start theme off for one session without
-   touching `Gothic.ini`). Offered to the user, not requested yet; ask before building it.
+6. Optional `-nomusic` flag for quiet manual test sessions. Offered to the user, not requested yet; ask first.
 
 ## Working with the user
 

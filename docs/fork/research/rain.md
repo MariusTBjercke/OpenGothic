@@ -92,6 +92,21 @@ Despite the name, `strength` is the position inside a new window of length `d = 
 - Fall direction is straight down, tilted by the global wind scaled with `zRainWindScale`.
 - Textures: `SKYRAIN.TGA` (drops), `SKYRAINSPLASH.TGA` (splashes); `rain_01.wav` loop.
 
+## Rain cloud layer and wind
+
+- `zCSkyControler_Outdoor::RenderSky` draws the two normal sky layers, then, while it rains,
+  `zCSkyLayer::RenderRainCloudLayer` (0x005e5d00): a dome with `SKYRAINCLOUDS.TGA`, alpha blended over the sky.
+  Its alpha is `min(255, round(weight*255)*2)`, so the sky is fully covered from rain weight 0.5. The color comes
+  from three floats of the sky controller (+0xa4..+0xac, probably the current upper dome color). The texture
+  scrolls slowly (mapping direction about 1.3e-5 / 3e-6 per ms). Not drawn under water.
+- Wind: `zCOutdoorRainFX::CreateParticles` (0x005e1c70) takes the global wind vector of the sky controller
+  (`GetGlobalWindVec`, enabled by `[ENGINE] zWindEnabled`), scales its x/z by `zRainWindScale` (default 0.003),
+  sets y = -1, normalizes and uses that as the fall direction. `CalcGlobalWind` (0x005ea210) varies the wind with
+  `[ENGINE] zWindStrength` 70 +- 40, `zWindCycleTime` 4 +- 2 and `zWindAngleVelo` 0.9 +- 0.8; at the average
+  strength the tilt is about 12 degrees.
+- Splashes: `zCOutdoorRainFX::RenderParticles` (0x005e25d0) draws each splash as a quad of `(1 - t) * 25` cm
+  that shrinks over its life.
+
 ## Particle collision of script effects (`flyCollDet`)
 
 Not rain-specific, but relevant when copying the drop behavior to other effects. `zCParticleFX::UpdateParticle`
@@ -107,9 +122,9 @@ plus G1-only `fade_scale, render_lightning, is_raining, rain_ctr`.
 
 ## Open questions
 
-- Particle parameters (count, area around camera, speed, splash ray-tests) in `zCOutdoorRainFX`.
-- How much `RenderRainCloudLayer` darkens the sky, and fog changes during rain.
-- `zRainWindScale` (`[SKY_OUTDOOR]` ini) effect on drop direction.
+- Drop speed and lifetime in `zCOutdoorRainFX` (the fall direction is scaled by 1.5 after normalizing; units not
+  checked).
+- Whether the original changes fog during rain.
 
 ## Implementation status in this fork
 
@@ -119,25 +134,35 @@ Implemented in `common/world/weather.{h,cpp}` (class `Weather`, owned by `World`
   `Wld_IsRaining` (`common/game/gamescript.cpp`), `[GAME] skyEffects=0` disables rain.
 - State is saved per world in the optional save entry `worlds/<zen>/weather`, so the save format version is
   unchanged and older saves load with the default window.
-- `rain_01.wav` loop that follows the listener with the original volume slope, x0.25 inside portal rooms
-  (`World::roomAt`, our stand-in for location hints 1 and 2) and under water (`Camera::isInWater`).
+- `rain_01.wav` loop that follows the listener with the original volume slope, x0.25 indoors and under water
+  (`Camera::isInWater`). Indoors (our stand-in for location hints 1 and 2): a roof above (upward ray) and either a
+  portal room (`World::roomAt`) or a roof within 15 m plus walls within 8 m on three of four sides. The harbour
+  huts, for example, are no portal rooms. Checked every 200 ms.
 - Drops: a world-space box particle emitter (`SKYRAIN.TGA`, velocity aligned, additive) 1250 in front of the camera,
   density scaled with the weight. It stays on indoors, so rain outside is visible from caves and houses.
 - Drops stop at roofs and the ground: each new drop gets one `DynamicWorld::ray` from above the top of the world
-  mesh (at least 50 m above the drop) down to where its lifetime would end (`ParticleFx::clipLife` hook, called from `PfxBucket::init`). The lifetime ends at the
+  mesh (at least 50 m above the drop) down to where its lifetime would end (`ParticleFx::spawnHook`, called from `PfxBucket::init`). The lifetime ends at the
   first hit; drops whose ray hits above their spawn point (born under a roof) are not spawned. Measured with a
   temporary counter: from the benchmark camera above the city about 16 % of drops are shortened and almost none
   skipped; inside Xardas' tower 22 % are skipped and 15 % shortened; at two waypoints inside the CITYFOREST cave
   all drops are skipped. Benchmark FPS unchanged (76). The ray starts above the world mesh because a start point
   only 50 m above the drop can lie inside the rock above a deep cave; back faces are filtered, so such a ray would
   miss the mountain surface and let drops into the cave. That case was reasoned about, not observed.
-  The hit points are where splashes would go; no splashes yet.
+- Splashes: a second emitter (`SKYRAINSPLASH.TGA`, additive billboards 12 to 24 cm, 250 ms, up to 400/s) in a
+  24 m square in front of the camera. Its `spawnHook` moves each splash to the first static surface below the sky
+  at its x/z, so splashes land on ground, roofs and barrels, and none appear indoors.
+- Wind: the drop direction is tilted by a slowly varying wind in the original's strength range times
+  `zRainWindScale` (read from `[SKY_OUTDOOR]`, default 0.003). Not linked to the vegetation wind in the renderer.
+- Overcast: `SceneDesc.rain` (set via `WorldView::setRainWeight`) drives the sky shaders with the original's
+  coverage `min(1, 2*weight)`: a grey layer over the sky in `clouds.glsl` (lit by the average horizon radiance,
+  varied by the day cloud texture), more haze and less blue in the atmosphere and fog LUTs (`rainClouds` in
+  `sky_common.glsl`), sun and moon discs hidden (`sun.frag`). Stars disappear at night. We do not use
+  `SKYRAINCLOUDS.TGA`.
 - Lighting: `shader/lighting/sky_exposure.comp` dims direct sun (-80%) and ambient (-40%) by the rain weight
   after exposure is computed, the same way the cloud factor is applied, so the scene gets darker instead of the
   auto exposure brightening it.
 
-Not done yet (prioritized list in `docs/fork/handoff-rain.md`): grey/overcast sky and rain cloud layer
-(`SKYRAINCLOUDS.TGA`), splashes, wind tilt (`zRainWindScale`), lightning.
+Not done yet (list in `docs/fork/handoff-rain.md`): lightning, wet surfaces.
 
 Verify with:
 
