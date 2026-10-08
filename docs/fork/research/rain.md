@@ -164,8 +164,9 @@ Implemented in `common/world/weather.{h,cpp}` (class `Weather`, owned by `World`
   auto exposure brightening it.
 
 - Wet surfaces (fork only, the original has none): `Weather` keeps a wetness value (20 s to get wet in full rain,
-  about 3 min to dry) and a rain map, 64 x 64 cells of 1 m around the camera with the height of the topmost static
-  surface (256 rays per tick). `shader/lighting/rain_wet.frag` darkens the albedo of surfaces that are that
+  about 3 min to dry) and a rain map, 128 x 128 cells of 1 m around the camera with the height of the topmost static
+  surface. Each cell is traced once (static world); cells that enter at the edge are traced first, up to 512 rays
+  per tick. The shader averages exposure over nine points in a 1.2 m circle for soft edges. `shader/lighting/rain_wet.frag` darkens the albedo of surfaces that are that
   topmost surface (right after the G-buffer, multiplied in) and adds a faint Fresnel sky reflection on up-facing
   ones after the lights (`-DSHEEN`), only under the overcast and not on foliage. Floors under roofs stay dry.
 
