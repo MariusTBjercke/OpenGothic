@@ -7,7 +7,7 @@ Status as of 2026-10-08 (third session). Written for the next agent picking this
 
 - Branch: **`feat/rain`**, **not merged into `master` yet**. The user is play-testing it; merge when they say so
   (fast-forward or merge commit, then push `master`).
-- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@97ad8db0` (see `BUILD.txt` there).
+- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@e2be86dd` (see `BUILD.txt` there).
   It holds the user's real saves; never use it as a working directory for automated runs. `save game` typed in the
   console there overwrites `save_slot_1.sav`, the first menu slot.
 
@@ -35,6 +35,7 @@ Commits on the branch, oldest first (all self-contained, see `git log master..fe
 | `54163a1f` | drops tilted by a varying wind (`zRainWindScale`) |
 | `1947b281` | indoor check for the muffled sound: roof ray plus portal room or walls on three sides |
 | `97ad8db0` | overcast darker (0.3 of horizon radiance) and without the cross at the zenith (user reports) |
+| `e2be86dd` | splashes from a queue of drop landings (same place and time), 6 to 12 cm, softer; user liked it |
 | docs commits | `AGENTS.md`, research notes, this file |
 
 ## What works (verified)
