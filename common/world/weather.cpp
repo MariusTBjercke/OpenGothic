@@ -81,6 +81,10 @@ Weather::Weather(World& owner)
   :owner(owner) {
   auto fx = Gothic::settingsGetS("GAME","skyEffects");
   enabled = (fx.empty() || fx!="0");
+
+  auto ws = Gothic::settingsGetS("SKY_OUTDOOR","zRainWindScale");
+  if(!ws.empty())
+    windScale = Gothic::settingsGetF("SKY_OUTDOOR","zRainWindScale");
   }
 
 Weather::~Weather() {
@@ -218,6 +222,7 @@ void Weather::tickFx(uint64_t dt) {
     if(front.quadLength()>0.f)
       front = front/front.length();
     fx.ppsValue = MaxDropsPps*weight;
+    tickWind(fx,dt);
     drops.setPosition(lp.pos + front*AheadOfCamera);
     drops.setActive(true);
     }
@@ -243,6 +248,19 @@ void Weather::tickFx(uint64_t dt) {
   else if(!splashes.isEmpty()) {
     splashes.setActive(false);
     }
+  }
+
+void Weather::tickWind(ParticleFx& fx, uint64_t dt) {
+  // the original tilts the fall direction by the global wind (strength 70 +- 40, slowly turning; [ENGINE] zWind*)
+  // scaled with [SKY_OUTDOOR] zRainWindScale: about 12 degrees at the average strength
+  windTime += dt;
+  const float t        = float(windTime%(1000u*1000u*1000u))/1000.f;
+  const float strength = 70.f + 40.f*std::sin(t*0.4f) * std::sin(t*0.13f + 1.f);
+  const float heading  = 2.0f*std::sin(t*0.021f) + 0.6f*std::sin(t*0.17f);
+  const float tilt     = std::atan(strength*windScale)*180.f/float(M_PI);
+
+  fx.dirAngleElev = -90.f + tilt;
+  fx.dirAngleHead = heading*180.f/float(M_PI);
   }
 
 ParticleFx& Weather::splashParticles() {

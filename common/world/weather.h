@@ -41,6 +41,7 @@ class Weather final {
   private:
     void  rollRain();
     void  tickFx(uint64_t dt);
+    void  tickWind(ParticleFx& fx, uint64_t dt);
     bool  isSheltered(const Tempest::Vec3& pos) const;
 
     static ParticleFx& rainParticles();
@@ -60,6 +61,8 @@ class Weather final {
     bool          sheltered   = false;
     float         sndVolume   = 0.f;
     float         sndBase     = 1.f;
+    float         windScale   = 0.003f; // [SKY_OUTDOOR] zRainWindScale
+    uint64_t      windTime    = 0;
     Tempest::SoundEffect sound;
     PfxEmitter    drops;
     PfxEmitter    splashes;
