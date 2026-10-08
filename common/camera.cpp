@@ -828,18 +828,23 @@ void Camera::tickThirdPerson(float dtF) {
   rotOffsetMat.project(dir);
 
   if(true && def.collision!=0) {
-    auto rotation = calcLookAtAngles(inter.target + dir*range, inter.target, inter.rotOffset, state.spin);
-    // testd in marvin: collision is calculated from offseted 'target', not from npc
-    range = calcCameraColision(inter.target, dir, rotation, range);
-    // NOTE: with range < 80, camera gradually moves up in vanilla
-    if(range<80.f) {
-      range      = 150; // also collision?!
-      rotation.x = 80;
-      rotation.y = state.spin.y;
-      const auto rotOffsetMat = mkRotMatrix(rotation);
+    // NOTE: with range < 80, camera gradually moves up in vanilla.
+    // Raise elevation in small steps until there is room; jumping straight to 80 degrees
+    // flipped the camera to look down at the player when it was lowered against the ground.
+    auto  spin    = state.spin;
+    float colDist = range;
+    while(true) {
+      const auto rotOffsetMat = mkRotMatrix(spin);
       dir = Vec3{0,0,1};
       rotOffsetMat.project(dir);
+      auto rotation = calcLookAtAngles(inter.target + dir*range, inter.target, inter.rotOffset, spin);
+      // testd in marvin: collision is calculated from offseted 'target', not from npc
+      colDist = calcCameraColision(inter.target, dir, rotation, range);
+      if(colDist>=80.f || spin.x>=80.f)
+        break;
+      spin.x = std::min(spin.x+5.f, 80.f);
       }
+    range = (colDist<80.f) ? 150.f : colDist; // also collision?!
     }
 
   if(def.translate!=0) {
