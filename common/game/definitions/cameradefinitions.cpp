@@ -33,6 +33,7 @@ CameraDefinitions::CameraDefinitions() {
   camModSwim      = getCam("CAMMODSWIM");
   camModDive      = getCam("CAMMODDIVE");
   camModFall      = getCam("CAMMODFALL");
+  camModLook      = find("CAMMODLOOK")!=nullptr ? getCam("CAMMODLOOK") : camModNormal;
 
   // dialog presets: unused yet
   std::vector<zenkit::VCutsceneCamera> cameras;

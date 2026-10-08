@@ -573,13 +573,18 @@ bool PlayerControl::tickMove(uint64_t dt) {
   if(ctrl[Action::K_K] && Gothic::inst().isMarvinEnabled())
     marvinK(dt);
   cacheFocus = ctrl[Action::ActionGeneric];
-  if(camera!=nullptr)
-    camera->setLookBack(ctrl[Action::LookBack]);
+  // vanilla: the look key orbits the camera while standing (CAMMODLOOK), and looks back while moving
+  lookAround = ctrl[Action::LookBack] && pl!=nullptr && canLookAround(*pl) && (lookAround || pl->isStanding());
+  if(camera!=nullptr) {
+    camera->setLookAround(lookAround);
+    camera->setLookBack(ctrl[Action::LookBack] && !lookAround);
+    }
 
   if(pl==nullptr)
     return true;
 
   implMove(dt);
+  tickHead(*pl,dt);
 
   float runAngle = pl->runAngle();
   if(runAngle!=0.f || std::fabs(runAngleDest)>0.01f) {
@@ -677,6 +682,14 @@ void PlayerControl::implMove(uint64_t dt) {
 
   if(!pl.isInState(ScriptFn()) || dlg.isActive()) {
     runAngleDest = 0;
+    return;
+    }
+
+  if(lookAround) {
+    // mouse moves the camera, movement keys turn the head (see tickHead)
+    runAngleDest = 0;
+    rotMouse     = 0;
+    rotMouseY    = 0;
     return;
     }
 
@@ -955,6 +968,32 @@ void PlayerControl::implMove(uint64_t dt) {
     assignRunAngle(pl,pl.rotation(),dt);
     }
   pl.setDirection(rot);
+  }
+
+bool PlayerControl::canLookAround(Npc& pl) const {
+  return pl.interactive()==nullptr && pl.isAiQueueEmpty() && !pl.isDown() && !dlg.isActive() &&
+         !pl.isSwim() && !pl.isDive() && !pl.isInAir() && !pl.isFalling();
+  }
+
+void PlayerControl::tickHead(Npc& pl, uint64_t dt) {
+  // vanilla (oCAIHuman::ChangeCamModeBySituation): while looking around, turn keys turn the head
+  // sideways and forward/back tilt it; it looks straight ahead otherwise
+  if(lookAround) {
+    Tempest::Vec2 dst;
+    if(wantsToTurnLeft())
+      dst.x = -60;
+    if(wantsToTurnRight())
+      dst.x = 60;
+    if(wantsToMoveForward())
+      dst.y = 20;
+    if(wantsToMoveBackward())
+      dst.y = -20;
+    pl.turnHead(dst,dt);
+    headTurned = true;
+    }
+  else if(headTurned) {
+    headTurned = !pl.turnHead(Tempest::Vec2(),dt);
+    }
   }
 
 void PlayerControl::implMoveMobsi(Npc& pl, uint64_t /*dt*/) {

@@ -1409,6 +1409,24 @@ bool Npc::implLookAt(float dx, float dy, float dz, uint64_t dt) {
   return false;
   }
 
+bool Npc::turnHead(Vec2 dst, uint64_t dt) {
+  // same turn speed as implLookAt; returns true once the head reached dst
+  static const float rotSpeed = 200; // deg per second
+  const float step = rotSpeed*float(dt)/1000.f;
+
+  auto approach = [step](float cur, float dst) {
+    if(std::abs(dst-cur)<=step)
+      return dst;
+    return cur<dst ? cur+step : cur-step;
+    };
+
+  auto rot = visual.headRotation();
+  rot.x = approach(rot.x, dst.x);
+  rot.y = approach(rot.y, dst.y);
+  visual.setHeadRotation(rot.x,rot.y);
+  return rot.x==dst.x && rot.y==dst.y;
+  }
+
 bool Npc::implTurnAway(const Npc &oth, uint64_t dt) {
   if(&oth==this)
     return true;

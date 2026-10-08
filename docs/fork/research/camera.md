@@ -66,7 +66,30 @@ The look-at target is the player position without smoothing (`UpdatePlayerPos` s
 Mouse turning of the player (`oCAIHuman::PC_Turnings`, contains 0x0069a9ad) scales mouse X by
 `zMouseRotationScale` (default 2.0) and turns the model directly through the animation controller.
 
+## Look key (`keyLook`, default R and Numpad 0)
+
+`oCAIHuman::ChangeCamModeBySituation` (0x0069cd60) checks the look key (logical key 0x10) each frame:
+
+- **Player standing** (`IsStanding`): stops turn animations, switches to `CAMMODLOOK` and sets the head look
+  target from the movement keys: left/right keys turn the head fully to that side, up/down keys tilt it, no key
+  looks straight ahead. The mouse does not drive the head.
+- **Player moving**: switches to `CAMMODLOOKBACK` (a fixed camera looking back at the player).
+
+`zCAICamera::CheckKeys` (writes the look-around flag at 0x004a4f8e) moves the camera with
+the mouse while the key is held, in a set of modes that includes `CAMMODLOOK` and `CAMMODLOOKBACK`: mouse Y
+changes elevation (clamped -60..85), mouse X changes azimuth (clamped -80..90 for these modes, ±180 for
+inventory, death and mob cameras). The look-around flag also makes the position easing use mouse sensitivity
+(see above).
+
+`CAMMODLOOK` (CamInst.d): range 1.5..6.5 (best 3.0), elevation -55..80 (best 30), azimuth -90..90,
+veloTrans 35.
+
 ## OpenGothic differences (as of 2026-10-08)
+
+- The look key only switched to `CAMMODLOOKBACK`, also while standing, and the mouse kept turning the player.
+  Now standing gives `CAMMODLOOK`: the mouse orbits the camera within its azimuth limits, movement keys turn
+  the head (±60° sideways, ±20° up/down), and walking is blocked while the key is held. The camera keeps its
+  current distance instead of switching to `CAMMODLOOK`'s range limits.
 
 - `Camera::followTrans` used a single lerp at `0.25 * veloTrans` per second (10 per second for the normal
   camera, about 100 ms lag), so turning with the mouse felt delayed. Changed to the two-step vanilla factor,
