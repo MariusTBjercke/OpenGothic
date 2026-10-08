@@ -652,8 +652,21 @@ Tempest::Vec3 Camera::followTrans(Vec3 pos, Tempest::Vec3 dest, float dtF, float
     time = tx;
     }
   */
-  static float k = 0.25f;
-  return pos + (dest-pos)*std::min(1.f, k*velo*dtF);
+  // Vanilla (zCMovementTracker) eases in two steps per frame, see docs/fork/research/camera.md:
+  // a lerp toward the ideal position at 2*veloTrans per second (faster in melee), then a weighted
+  // average with the current position that speeds up with distance. Its factor depends on frame rate,
+  // so evaluate it at 60 fps and apply it as a frame-rate independent rate.
+  const float dt60 = 1.f/60.f;
+  const float frac = std::min((dest-pos).length()/500.f, 1.f);
+  float rate = velo + (std::max(velo,10.f)-velo)*frac;
+  if(camMod==Melee)
+    rate = velo + 20.f*frac;
+  const float k1   = std::clamp(2.f*rate*dt60, 0.f, 1.f);
+  const float d2   = (dest-pos).quadLength()*k1*k1*1e-5f;
+  const float k2   = dt60/0.05f * (d2*4.f+1.f)/(d2+1.f);
+  const float f60  = k1*k2/(1.f+k2);
+  const float k    = 1.f - std::pow(1.f-f60, dtF*60.f);
+  return pos + (dest-pos)*k;
   }
 
 Tempest::Vec3 Camera::followRot(Vec3 spin, Tempest::Vec3 dest, float dtF, float velo) {
@@ -828,18 +841,23 @@ void Camera::tickThirdPerson(float dtF) {
   rotOffsetMat.project(dir);
 
   if(true && def.collision!=0) {
-    auto rotation = calcLookAtAngles(inter.target + dir*range, inter.target, inter.rotOffset, state.spin);
-    // testd in marvin: collision is calculated from offseted 'target', not from npc
-    range = calcCameraColision(inter.target, dir, rotation, range);
-    // NOTE: with range < 80, camera gradually moves up in vanilla
-    if(range<80.f) {
-      range      = 150; // also collision?!
-      rotation.x = 80;
-      rotation.y = state.spin.y;
-      const auto rotOffsetMat = mkRotMatrix(rotation);
+    // NOTE: with range < 80, camera gradually moves up in vanilla.
+    // Raise elevation in small steps until there is room; jumping straight to 80 degrees
+    // flipped the camera to look down at the player when it was lowered against the ground.
+    auto  spin    = state.spin;
+    float colDist = range;
+    while(true) {
+      const auto rotOffsetMat = mkRotMatrix(spin);
       dir = Vec3{0,0,1};
       rotOffsetMat.project(dir);
+      auto rotation = calcLookAtAngles(inter.target + dir*range, inter.target, inter.rotOffset, spin);
+      // testd in marvin: collision is calculated from offseted 'target', not from npc
+      colDist = calcCameraColision(inter.target, dir, rotation, range);
+      if(colDist>=80.f || spin.x>=80.f)
+        break;
+      spin.x = std::min(spin.x+5.f, 80.f);
       }
+    range = (colDist<80.f) ? 150.f : colDist; // also collision?!
     }
 
   if(def.translate!=0) {
