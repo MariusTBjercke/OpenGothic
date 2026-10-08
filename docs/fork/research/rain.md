@@ -157,8 +157,9 @@ Implemented in `common/world/weather.{h,cpp}` (class `Weather`, owned by `World`
 - Overcast: `SceneDesc.rain` (set via `WorldView::setRainWeight`) drives the sky shaders with the original's
   coverage `min(1, 2*weight)`: a grey layer over the sky in `clouds.glsl` (lit by the average horizon radiance,
   varied by the day cloud texture), more haze and less blue in the atmosphere and fog LUTs (`rainClouds` in
-  `sky_common.glsl`), sun and moon discs hidden (`sun.frag`). Stars disappear at night. We do not use
-  `SKYRAINCLOUDS.TGA`.
+  `sky_common.glsl`), sun and moon discs hidden (`sun.frag`), Mie phase isotropic under the overcast (no sun halo). Stars
+  disappear at night. The overcast is shaped by `SKYRAINCLOUDS.TGA` in two layers of different scale and drift,
+  normalized to the texture's average so only the structure changes, not the brightness.
 - Lighting: `shader/lighting/sky_exposure.comp` dims direct sun (-80%) and ambient (-40%) by the rain weight
   after exposure is computed, the same way the cloud factor is applied, so the scene gets darker instead of the
   auto exposure brightening it.

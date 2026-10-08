@@ -7,7 +7,7 @@ Status as of 2026-10-08 (third session). Written for the next agent picking this
 
 - Branch: **`feat/rain`**, **not merged into `master` yet**. The user is play-testing it; merge when they say so
   (fast-forward or merge commit, then push `master`).
-- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@89df09c5` (see `BUILD.txt` there).
+- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@8a27a348` (see `BUILD.txt` there).
   It holds the user's real saves; never use it as a working directory for automated runs. `save game` typed in the
   console there overwrites `save_slot_1.sav`, the first menu slot.
 
@@ -43,6 +43,7 @@ Commits on the branch, oldest first (all self-contained, see `git log master..fe
 | `cb281256` | wetness on the game clock (5 min wet, 45 min dry, stepped through sleep), saved in `worlds/<zen>/wetness` |
 | `b220c4e1` | no sun halo behind the overcast: Mie phase blends to isotropic with coverage (user report) |
 | `89df09c5` | splashes on water: drops ending under a water surface end on it (`DynamicWorld::waterRay`) |
+| `8a27a348` | overcast shaped by `SKYRAINCLOUDS.TGA` (two layers, normalized to its average) (user: too few clouds) |
 | docs commits | `AGENTS.md`, research notes, this file |
 
 ## What works (verified)
@@ -143,8 +144,10 @@ Looking out of a cave (`ff6b424f`) was confirmed by the user in play.
 
 ## Suggested next steps (in order)
 
-1. **Close the open checks** above, then merge `feat/rain` into `master` when the user says so, and redeploy the
-   play folder (`scripts/deploy-play.ps1`). The user has not asked for a merge yet.
+1. **Merge round** (the user expects it soon): skip the Linux CI jobs in the fork first (`if: false` on `linux` and
+   `linux-deb` in `.github/workflows/build.yml`, user asked for Windows and macOS only; `release` needs them but
+   only runs on tags), list that under "Deliberate differences from upstream" in `AGENTS.md`, then merge
+   `feat/rain` into `master`, push (CI runs on push to master) and redeploy the play folder.
 2. **Tuning from user feedback**: wet darkening (0.3) and sheen (0.12) in `shader/lighting/rain_wet.frag`, wetting
    and drying times in `Weather::tickWetness`, overcast brightness (`rainOvercast` in `shader/sky/clouds.glsl`), haze amount
    (0.6 in `rainClouds`, `shader/sky/sky_common.glsl`), splash rate/size/alpha, drop count.
