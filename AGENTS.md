@@ -140,6 +140,10 @@ Keep these when merging upstream changes:
   its screenshot is drawn before the renderer had drawn the world once.
 - **Console save/load**: `save game` / `load game` use `save_slot_1.sav` like the original console (slot 1, not
   the quick save slot 0). `weather` (fork) prints today's rain window, weight and shelter state.
+- **Camera and look key**: `common/camera.cpp` (`tickThirdPerson`, `followTrans`, `clampRotation`), mode selection
+  in `MainWindow::tickCamera`/`solveCameraMode`, look key in `PlayerControl::tickMove`. Original behavior and
+  constants in `docs/fork/research/camera.md`. Tempest has no numpad key codes, so numpad bindings from
+  `Gothic.ini` (for example Numpad 0 in `keyLook`) never fire.
 - **Research on the original engine**: `Gothic2.exe` (2.6) is analyzed in a local Ghidra project with named
   ZenGin functions. Record findings in `docs/fork/research/<topic>.md` as behavior and constants in your own words;
   never commit decompiled code.
