@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
+#include <queue>
 
 #include "graphics/pfx/particlefx.h"
 #include "game/gamesession.h"
@@ -20,11 +21,10 @@ static const float DropLifetime  = 1500.f;
 static const float MaxDropsPps   = MaxDrops*1000.f/DropLifetime;
 static const float AheadOfCamera = 1250.f;
 
-// splashes: square around a point in front of the camera, at most this many per second at full rain
-static const float SplashArea    = 1200.f;
-static const float SplashAhead   = 600.f;
-static const float MaxSplashPps  = 400.f;
-static const float SplashLife    = 250.f;
+// splashes: one per drop that lands, when it lands. The splash emitter only asks often enough for landed drops
+static const float SplashPps     = 2000.f;
+static const float SplashLife    = 200.f;
+static const size_t MaxPendingHits = 4096;
 
 // the shelter ray of a new drop starts above the world mesh (at least this far above the drop), so drops born
 // under a roof or in a cave deep inside a mountain are skipped too
@@ -32,6 +32,18 @@ static const float ShelterRayUp  = 5000.f;
 
 static float rand01() {
   return float(std::rand())/float(RAND_MAX);
+  }
+
+// where and when (world tick, ms) a drop will land; filled by clipDrop, used by placeSplash
+struct DropHit {
+  Tempest::Vec3 pos;
+  uint64_t      due = 0;
+  bool operator < (const DropHit& other) const { return due>other.due; } // min-heap on 'due'
+  };
+static std::priority_queue<DropHit> pendingHits;
+
+static void clearPendingHits() {
+  pendingHits = std::priority_queue<DropHit>();
   }
 
 // ParticleFx::spawnHook for drops: end each drop where it hits the static world (roofs, ground, trees)
@@ -56,24 +68,28 @@ static uint16_t clipDrop(Tempest::Vec3& pos, const Tempest::Vec3& dir, uint16_t 
   const float dist = hit.hitFraction*(back+fall) - back;
   if(dist<=0.f)
     return 0; // under a roof already
-  return uint16_t(std::max(1.f, dist/speed));
+
+  const auto ret = uint16_t(std::max(1.f, dist/speed));
+  if(pendingHits.size()<MaxPendingHits)
+    pendingHits.push(DropHit{pos + dir*float(ret), world->tickCount() + ret});
+  return ret;
   }
 
-// ParticleFx::spawnHook for splashes: move the splash down (or up) to where rain lands at its x/z, i.e. the first
-// static surface below the sky. Skipped when that surface is far above or below the camera (cave ceilings,
-// mountain tops above, empty air).
+// ParticleFx::spawnHook for splashes: put the splash where a drop lands right now. Without a landed drop the
+// particle is skipped; landings that waited too long (no free splash slot) are dropped
 static uint16_t placeSplash(Tempest::Vec3& pos, const Tempest::Vec3&, uint16_t life) {
-  auto  world = Gothic::inst().world();
-  auto  phys  = world!=nullptr ? world->physic() : nullptr;
-  auto  view  = world!=nullptr ? world->view()   : nullptr;
-  if(phys==nullptr || view==nullptr)
+  auto world = Gothic::inst().world();
+  if(world==nullptr)
     return 0;
 
-  const float top = std::max(view->bbox().second.y + 100.f, pos.y + ShelterRayUp);
-  const auto  hit = phys->ray(Tempest::Vec3(pos.x,top,pos.z), Tempest::Vec3(pos.x,pos.y-2500.f,pos.z));
-  if(!hit.hasCol || hit.v.y>pos.y+1000.f)
+  const uint64_t now = world->tickCount();
+  while(!pendingHits.empty() && pendingHits.top().due+100<now)
+    pendingHits.pop();
+  if(pendingHits.empty() || pendingHits.top().due>now)
     return 0;
-  pos = hit.v + Tempest::Vec3(0,3,0);
+
+  pos = pendingHits.top().pos + Tempest::Vec3(0,3,0);
+  pendingHits.pop();
   return life;
   }
 
@@ -85,6 +101,9 @@ Weather::Weather(World& owner)
   auto ws = Gothic::settingsGetS("SKY_OUTDOOR","zRainWindScale");
   if(!ws.empty())
     windScale = Gothic::settingsGetF("SKY_OUTDOOR","zRainWindScale");
+
+  // landings belong to the previous world's clock
+  clearPendingHits();
   }
 
 Weather::~Weather() {
@@ -257,19 +276,14 @@ void Weather::tickFx(uint64_t dt) {
     drops.setActive(false);
     }
 
-  // splashes where rain lands, in a smaller square in front of the camera (placeSplash)
+  // splashes where and when drops land (placeSplash); the emitter only has to stay near the camera
   auto& sfx = splashParticles();
   if(weight>0.f) {
     if(splashes.isEmpty()) {
-      sfx.ppsValue = MaxSplashPps;
       splashes = PfxEmitter(owner,&sfx);
       splashes.setLooped(true);
       }
-    Tempest::Vec3 front = Tempest::Vec3(lp.front.x,0,lp.front.z);
-    if(front.quadLength()>0.f)
-      front = front/front.length();
-    sfx.ppsValue = MaxSplashPps*weight;
-    splashes.setPosition(lp.pos + front*SplashAhead);
+    splashes.setPosition(lp.pos);
     splashes.setActive(true);
     }
   else if(!splashes.isEmpty()) {
@@ -296,30 +310,25 @@ ParticleFx& Weather::splashParticles() {
   if(fx!=nullptr)
     return *fx;
 
-  const std::string dim = std::to_string(int(SplashArea)) + " 0 " + std::to_string(int(SplashArea));
-
   zenkit::IParticleEffect src;
-  src.pps_value             = MaxSplashPps;
+  src.pps_value             = SplashPps;
   src.pps_is_looping        = 1;
   src.pps_fps               = 1;
-  src.shp_type_s            = "BOX";
+  src.shp_type_s            = "POINT";
   src.shp_for_s             = "WORLD";
-  src.shp_offset_vec_s      = "0 0 0";
-  src.shp_dim_s             = dim;
-  src.shp_is_volume         = 1;
   src.dir_mode_s            = "NONE";
   src.vel_avg               = 0;
   src.lsp_part_avg          = SplashLife;
-  src.lsp_part_var          = 50;
+  src.lsp_part_var          = 40;
   src.vis_name_s            = "SKYRAINSPLASH.TGA";
   src.vis_orientation_s     = "NONE";
   src.vis_tex_is_quadpoly   = 1;
   src.vis_tex_color_start_s = "190 200 220";
   src.vis_tex_color_end_s   = "190 200 220";
-  src.vis_size_start_s      = "12 12";  // grows to 24 cm (the original shrinks a 25 cm quad)
+  src.vis_size_start_s      = "6 6";  // grows to 12 cm, about the drop width; the original shrinks a 25 cm quad
   src.vis_size_end_scale    = 2;
   src.vis_alpha_func_s      = "ADD";
-  src.vis_alpha_start       = 200;
+  src.vis_alpha_start       = 130;
   src.vis_alpha_end         = 0;
   src.use_emitters_for      = 0;
 
