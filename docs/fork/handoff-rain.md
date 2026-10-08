@@ -7,7 +7,7 @@ Status as of 2026-10-08 (third session). Written for the next agent picking this
 
 - Branch: **`feat/rain`**, **not merged into `master` yet**. The user is play-testing it; merge when they say so
   (fast-forward or merge commit, then push `master`).
-- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@e2be86dd` (see `BUILD.txt` there).
+- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@e8580156` (see `BUILD.txt` there).
   It holds the user's real saves; never use it as a working directory for automated runs. `save game` typed in the
   console there overwrites `save_slot_1.sav`, the first menu slot.
 
@@ -36,6 +36,7 @@ Commits on the branch, oldest first (all self-contained, see `git log master..fe
 | `1947b281` | indoor check for the muffled sound: roof ray plus portal room or walls on three sides |
 | `97ad8db0` | overcast darker (0.3 of horizon radiance) and without the cross at the zenith (user reports) |
 | `e2be86dd` | splashes from a queue of drop landings (same place and time), 6 to 12 cm, softer; user liked it |
+| `e8580156` | wet surfaces: rain height map, darker albedo after the G-buffer, sky sheen after the lights |
 | docs commits | `AGENTS.md`, research notes, this file |
 
 ## What works (verified)
@@ -71,7 +72,8 @@ Commits on the branch, oldest first (all self-contained, see `git log master..fe
    `zstartrain 0.5`, then talk to an ambient NPC outdoors.
 2. **Drops at roofs from the ground**: the screenshots were taken inside the tower and from the high benchmark
    camera. Standing under a roof overhang or a market stall in the city has not been looked at.
-3. **The second batch in real play** (`0f5036f5` to `1947b281`): overcast sky, splashes, wind tilt and the
+3. **Wet surfaces in real play** (`e8580156`): only screenshots at the harbour, the farm path and in a hut.
+4. **The second batch in real play** (`0f5036f5` to `1947b281`): overcast sky, splashes, wind tilt and the
    muffled sound in huts were checked with screenshots and the `weather` command only.
 
 Looking out of a cave (`ff6b424f`) was confirmed by the user in play.
@@ -126,12 +128,11 @@ Looking out of a cave (`ff6b424f`) was confirmed by the user in play.
 
 1. **Close the open checks** above, then merge `feat/rain` into `master` when the user says so, and redeploy the
    play folder (`scripts/deploy-play.ps1`). The user has not asked for a merge yet.
-2. **Wet surfaces**: darker albedo and more specular on upward-facing outdoor surfaces with the rain weight (a
-   term in the G-buffer or lighting shaders, gated by `scene.rain`). Must not wet roofed areas; the drop/splash
-   rays cannot help there, so it probably needs a sky-visibility term (the renderer has cloud shadow / sky
-   occlusion data). Not in the original game.
-3. **Tuning from user feedback**: overcast brightness (`rainOvercast` in `shader/sky/clouds.glsl`), haze amount
+2. **Tuning from user feedback**: wet darkening (0.3) and sheen (0.6) in `shader/lighting/rain_wet.frag`, wetting
+   and drying times in `Weather::tickWetness`, overcast brightness (`rainOvercast` in `shader/sky/clouds.glsl`), haze amount
    (0.6 in `rainClouds`, `shader/sky/sky_common.glsl`), splash rate/size/alpha, drop count.
+3. **Wet surfaces beyond 32 m** count as exposed (outside the rain map), so far indoor floors seen through a door
+   could look wet. Not seen yet; a bigger map or a second coarse ring would fix it.
 4. **Lightning**: the flag is rolled and saved like the original, but G2 does not seem to render it (ZenKit marks
    the save fields G1 only). Research before building anything.
 5. **Unit tests for pure logic** (`Weather::skyTime`, `rainWeightAt`, window rolling): there is no test target,
