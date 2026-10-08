@@ -166,8 +166,8 @@ Implemented in `common/world/weather.{h,cpp}` (class `Weather`, owned by `World`
 - Wet surfaces (fork only, the original has none): `Weather` keeps a wetness value (20 s to get wet in full rain,
   about 3 min to dry) and a rain map, 64 x 64 cells of 1 m around the camera with the height of the topmost static
   surface (256 rays per tick). `shader/lighting/rain_wet.frag` darkens the albedo of surfaces that are that
-  topmost surface (right after the G-buffer, multiplied in) and adds a Fresnel sky reflection on up-facing ones
-  after the lights (`-DSHEEN`). Floors under roofs stay dry.
+  topmost surface (right after the G-buffer, multiplied in) and adds a faint Fresnel sky reflection on up-facing
+  ones after the lights (`-DSHEEN`), only under the overcast and not on foliage. Floors under roofs stay dry.
 
 Not done yet (list in `docs/fork/handoff-rain.md`): lightning.
 

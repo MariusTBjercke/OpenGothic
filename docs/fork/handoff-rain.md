@@ -7,7 +7,7 @@ Status as of 2026-10-08 (third session). Written for the next agent picking this
 
 - Branch: **`feat/rain`**, **not merged into `master` yet**. The user is play-testing it; merge when they say so
   (fast-forward or merge commit, then push `master`).
-- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@e8580156` (see `BUILD.txt` there).
+- The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@b24f5c52` (see `BUILD.txt` there).
   It holds the user's real saves; never use it as a working directory for automated runs. `save game` typed in the
   console there overwrites `save_slot_1.sav`, the first menu slot.
 
@@ -37,6 +37,7 @@ Commits on the branch, oldest first (all self-contained, see `git log master..fe
 | `97ad8db0` | overcast darker (0.3 of horizon radiance) and without the cross at the zenith (user reports) |
 | `e2be86dd` | splashes from a queue of drop landings (same place and time), 6 to 12 cm, softer; user liked it |
 | `e8580156` | wet surfaces: rain height map, darker albedo after the G-buffer, sky sheen after the lights |
+| `b24f5c52` | sheen faint (0.15), only under the overcast, not on foliage; darker wet albedo (user: looked like ice) |
 | docs commits | `AGENTS.md`, research notes, this file |
 
 ## What works (verified)
@@ -106,6 +107,10 @@ Looking out of a cave (`ff6b424f`) was confirmed by the user in play.
   screenshots: same waypoint dry and rain (`-Marvin "cheat god;set time 13 0;[zstartrain 0.5;]goto waypoint X"`,
   idle, shot at 14 s) and compare mean brightness. `cheat god` keeps the hero alive near monsters; dense forest
   waypoints can put the camera inside foliage. `NW_CITY_TO_FARM2_05` and `NW_CITY_HABOUR_05` give usable views.
+- **Wet sheen turns into ice or snow** when it is strong, reflects the clear sky after rain, or lands on foliage
+  (pine branches face up). Keep it faint, scale it with the overcast (`rainCover`) and skip alpha tested pixels
+  (G-buffer hint bit 2). Test "wet, then rain stopped": save while it rains, load with `-LoadSave` (wetness starts
+  at the rain weight) and run `zstartrain 1`.
 - **Anything per pixel in the sky must not depend on the view azimuth near the zenith**: samples that follow the
   view direction (as `applyClouds` does for the dry cloud highlight) form a cross when looking straight up.
 - **Script videos block `-marvin`**: startup commands wait for a drawn world frame, and a new game plays the intro
@@ -128,7 +133,7 @@ Looking out of a cave (`ff6b424f`) was confirmed by the user in play.
 
 1. **Close the open checks** above, then merge `feat/rain` into `master` when the user says so, and redeploy the
    play folder (`scripts/deploy-play.ps1`). The user has not asked for a merge yet.
-2. **Tuning from user feedback**: wet darkening (0.3) and sheen (0.6) in `shader/lighting/rain_wet.frag`, wetting
+2. **Tuning from user feedback**: wet darkening (0.35) and sheen (0.15) in `shader/lighting/rain_wet.frag`, wetting
    and drying times in `Weather::tickWetness`, overcast brightness (`rainOvercast` in `shader/sky/clouds.glsl`), haze amount
    (0.6 in `rainClouds`, `shader/sky/sky_common.glsl`), splash rate/size/alpha, drop count.
 3. **Wet surfaces beyond 32 m** count as exposed (outside the rain map), so far indoor floors seen through a door
