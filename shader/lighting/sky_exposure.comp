@@ -109,7 +109,11 @@ void main() {
 
     const vec3  light  = sunColor*Fd_Lambert + ambient + skyIrradiance();
     const float objLum = dot(light, vec3(0.2125, 0.7154, 0.0721));
-    const float skyLum = (vmin + vmax) * 0.5 * scene.GSunIntensity;
+    // rain: the sky samples are mostly the overcast, about 0.3 of the sky behind it (RainOvercastBrightness in
+    // sky/clouds.glsl). Exposure looks at the sky behind it, else at sunset the missing sun glow pushes exposure up
+    // and the scene flashes bright before night
+    const float rainSky = mix(1.0, 1.0/0.3, min(push.rain*2.0, 1.0));
+    const float skyLum  = (vmin + vmax) * 0.5 * scene.GSunIntensity * rainSky;
 
     const float lum    = max(objLum*2.5, skyLum*clouds*1.5);
 
@@ -121,6 +125,13 @@ void main() {
     scene.sunColor     = sunColor * clouds * push.sunOcclusion * overcastSun;
     scene.ambient      = ambient  * clouds * overcastAmb;
     scene.exposure     = 1.0 / max(lum*1.25 + push.baseL, 0.0000001);
+
+    // rain at dusk: without rain the bright sky around the set sun keeps the exposure down for about ten minutes
+    // after sunset, so dusk gets dark. Behind the overcast that glow is missing and the scene flashed bright
+    // instead. Darken the exposure in the same sun height band (fitted to the dry brightness, up to x0.35)
+    const float sunY     = scene.sunDir.y;
+    const float duskBump = (1.0 - smoothstep(-0.04, 0.02, sunY)) * smoothstep(-0.18, -0.11, sunY);
+    scene.exposure      *= 1.0 - 0.65*duskBump*min(push.rain*2.0, 1.0);
     //scene.exposure     = 1.0 / max(6400, 0.0000005);
     scene.luminanceMed = lum;
     }
