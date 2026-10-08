@@ -39,6 +39,16 @@ struct ScatteringValues {
   float mieScattering;
   vec3  extinction;
   };
+// fork: rain overcast. Coverage as the rain cloud layer of the original: full from half rain weight
+float rainCover(float rain) {
+  return min(rain*2.0, 1.0);
+  }
+
+// fork: cloud amount for the atmosphere model while it rains: more haze (Mie), less blue (Rayleigh)
+float rainClouds(float clouds, float rain) {
+  return max(clouds, mix(clouds, 0.6, rainCover(rain)));
+  }
+
 // 4. Atmospheric model
 ScatteringValues scatteringValues(float altitudeKM, float clouds) {
   // Note: Paper gets these switched up. See SkyAtmosphereCommon.cpp:SetupEarthAtmosphere in demo app

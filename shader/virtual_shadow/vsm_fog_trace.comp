@@ -138,7 +138,7 @@ void pullScattering(const vec3 src, const vec3 dst) {
   atomicMax(altitudeMax, floatBitsToUint(max(altitudeKM0, altitudeKM1)));
   barrier();
 
-  const float clouds = textureLod(cloudsLUT, vec2(scene.isNight,0), 0).a;
+  const float clouds = rainClouds(textureLod(cloudsLUT, vec2(scene.isNight,0), 0).a, scene.rain);
   const float t      = (laneID+0.5)/NumThreads;
 
   const float altitudeKM = (mix(uintBitsToFloat(altitudeMin), uintBitsToFloat(altitudeMax), t) - RPlanet) / 1000.0;
@@ -165,7 +165,7 @@ vec3 _raymarchScattering(ivec2 pix, const uint sliceId, vec3 pos, vec3 rayDir, v
 
   const float phaseMie      = miePhase(cosTheta);
   const float phaseRayleigh = rayleighPhase(-cosTheta);
-  const float clouds        = textureLod(cloudsLUT, vec2(scene.isNight,0), 0).a;
+  const float clouds        = rainClouds(textureLod(cloudsLUT, vec2(scene.isNight,0), 0).a, scene.rain);
 
   const float altitudeKM0   = (length(pos              )-RPlanet) / 1000.0;
   const float altitudeKM1   = (length(pos + tMax*rayDir)-RPlanet) / 1000.0;
@@ -225,7 +225,7 @@ vec3 raymarchScattering(ivec2 pix, const uint sliceId, vec3 pos, vec3 rayDir, ve
   const float cosTheta      = dot(rayDir, sunDir);
   const float phaseMie      = miePhase(cosTheta);
   const float phaseRayleigh = rayleighPhase(-cosTheta);
-  const float clouds        = textureLod(cloudsLUT, vec2(scene.isNight,0), 0).a;
+  const float clouds        = rainClouds(textureLod(cloudsLUT, vec2(scene.isNight,0), 0).a, scene.rain);
 
   const float altitudeKM0   = (length(pos              )-RPlanet) / 1000.0;
   const float altitudeKM1   = (length(pos + tMax*rayDir)-RPlanet) / 1000.0;

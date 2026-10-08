@@ -63,6 +63,8 @@ void main() {
 
   lum *= push.GSunIntensity;
   lum *= scene.exposure;
+  // fork: hidden behind the rain overcast
+  lum *= 1.0 - min(scene.rain*2.0, 1.0);
 
   if(rayIntersect(pos, view, RPlanet)>=0.0) {
     lum = vec3(0.0);

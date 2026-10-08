@@ -35,6 +35,7 @@ class SceneGlobals final {
     void setSky(const Sky& s);
     void setWorld(const WorldView& wview);
     void setUnderWater(bool w);
+    void setRain(float w);
 
     void setTime(uint64_t time);
     void commitUbo(uint8_t fId);
@@ -120,6 +121,7 @@ class SceneGlobals final {
       Tempest::Vec2                   cloudsDir[2] = {};
 
       float                           probeGridBias = 3;
+      float                           rain          = 0; // fork: rain weight 0..1
       };
 
     Tempest::UniformBuffer<UboGlobal> uboGlobalPf[Resources::MaxFramesInFlight][V_Count];

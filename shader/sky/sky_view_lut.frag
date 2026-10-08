@@ -24,7 +24,7 @@ vec3 raymarchScattering(vec3 pos, vec3 rayDir, vec3 sunDir, float tMax) {
 
   const float phaseMie      = miePhase(cosTheta);
   const float phaseRayleigh = rayleighPhase(-cosTheta);
-  const float clouds        = textureLod(cloudsLUT, vec2(scene.isNight,0), 0).a;
+  const float clouds        = rainClouds(textureLod(cloudsLUT, vec2(scene.isNight,0), 0).a, scene.rain);
 
   vec3  scatteredLight = vec3(0.0);
   vec3  transmittance  = vec3(1.0);

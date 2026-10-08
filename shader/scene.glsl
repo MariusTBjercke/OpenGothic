@@ -38,6 +38,7 @@ struct SceneDesc {
   ivec2 screenRes;
   vec4  cloudsDir;
   float probeGridBias;
+  float rain; // fork: rain weight 0..1 (common/world/weather.cpp)
   };
 
 struct LightSource {

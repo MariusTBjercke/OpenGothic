@@ -44,10 +44,23 @@ vec4 clouds(vec3 at, float nightPhase, vec3 highlight,
   return color;
   }
 
+// fork: rain overcast, a grey layer lit by the average sky radiance; the day cloud texture adds variation
+vec3 rainOvercast(vec3 at, vec3 lum, vec2 dxy, in sampler2D dayL0) {
+  vec3  cloudsAt = normalize(at);
+  vec2  texc     = 2000.0*vec2(atan(cloudsAt.z,cloudsAt.y), atan(cloudsAt.x,cloudsAt.y));
+#if defined(SKY_LOD)
+  float detail   = textureLod(dayL0, texc*0.15 + dxy, SKY_LOD).a;
+#else
+  float detail   = texture(dayL0, texc*0.15 + dxy).a;
+#endif
+  float grey     = dot(lum*0.25, vec3(0.2125, 0.7154, 0.0721));
+  return vec3(grey) * (1.0 - 0.45*detail);
+  }
+
 vec3 applyClouds(vec3 skyColor, in sampler2D skyLUT, vec3 plPos, vec3 sunDir, vec3 view, float nightPhase,
                  vec2 dxy0, vec2 dxy1,
                  in sampler2D dayL1,   in sampler2D dayL0,
-                 in sampler2D nightL1, in sampler2D nightL0) {
+                 in sampler2D nightL1, in sampler2D nightL0, float rain) {
   float L = rayIntersect(plPos, view, RClouds);
   // TODO: http://killzone.dl.playstation.net/killzone/horizonzerodawn/presentations/Siggraph15_Schneider_Real-Time_Volumetric_Cloudscapes_of_Horizon_Zero_Dawn.pdf
   // fake cloud scattering inspired by Henyey-Greenstein model
@@ -61,7 +74,10 @@ vec3 applyClouds(vec3 skyColor, in sampler2D skyLUT, vec3 plPos, vec3 sunDir, ve
   vec4 cloud = clouds((plPos + view*L)*0.01, nightPhase, lum,
                       dxy0, dxy1,
                       dayL1,dayL0, nightL1,nightL0);
-  return skyColor + cloud.rgb * cloud.a;
+  vec3 ret   = skyColor + cloud.rgb * cloud.a;
+  if(rain>0.0)
+    ret = mix(ret, rainOvercast((plPos + view*L)*0.01, lum, dxy0, dayL0), rainCover(rain)*0.95);
+  return ret;
   // return mix(skyColor, cloud.rgb, cloud.a);
   }
 

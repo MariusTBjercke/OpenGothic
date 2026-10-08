@@ -92,7 +92,7 @@ vec3 applyClouds(vec3 skyColor) {
   vec3  viewDir  = normalize(pos1);
   return applyClouds(skyColor, skyLUT, plPos, scene.sunDir, viewDir, night,
                      scene.cloudsDir.xy, scene.cloudsDir.zw,
-                     textureDayL1,textureDayL0, textureNightL1,textureNightL0);
+                     textureDayL1,textureDayL0, textureNightL1,textureNightL0, scene.rain);
   }
 
 void main() {

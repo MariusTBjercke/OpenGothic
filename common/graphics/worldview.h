@@ -78,6 +78,7 @@ class WorldView {
     void                dbgClusters(Tempest::Painter& p, Tempest::Vec2 wsz);
 
     const SceneGlobals& sceneGlobals() const { return sGlobal; }
+    void                setRainWeight(float w) { sGlobal.setRain(w); }
     const Sky&          sky() const { return gSky; }
     const Landscape&    landscape() const { return land; }
     const LightGroup&   lights() const { return gLights; }

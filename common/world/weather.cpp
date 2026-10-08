@@ -152,6 +152,10 @@ void Weather::tickFx(uint64_t dt) {
   const auto lp     = camera.listenerPosition();
   sheltered         = isSheltered(lp.pos);
 
+  // overcast sky, haze and hidden sun in the sky/fog shaders (scene.rain)
+  if(auto view = owner.view())
+    view->setRainWeight(weight);
+
   // sound: follows the rain weight with a fixed slope, quieter indoors and under water (as the original)
   const float target = weight*(sheltered || camera.isInWater() ? 0.25f : 1.f);
   const float step   = 0.0005f*float(dt);
