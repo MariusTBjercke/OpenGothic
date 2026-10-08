@@ -213,8 +213,9 @@ the game runs; stop the process before reading it on Windows.
 `scripts/deploy-play.ps1` builds, runs the smoke test and copies the result to a stable folder outside the repo
 (default `OpenGothic-play` next to the Gothic installation, override with `-Dest` or `OPENGOTHIC_PLAY_DIR`).
 It writes `BUILD.txt` (branch/commit), `Play.bat` and `Play (devmode).bat` (same plus `-devmode`; never add
-`-window` to a launcher meant for playing, it disables mouse capture), plus `Play (Script Patch).bat` when the
-Gothic folder has `system/g2a_nr_scriptpatch_*.ini` (runs in `ScriptPatch\` so its saves stay apart), and never touches saves or
+`-window` to a launcher meant for playing, it disables mouse capture). When the Gothic folder has
+`system/g2a_nr_scriptpatch_*.ini` it adds `Play (Script Patch).bat` and a devmode variant, which run in
+`ScriptPatch\` so their saves stay apart (see `docs/fork/script-patch.md`). It never touches saves or
 `Gothic.ini` there. It refuses to deploy while the game runs from that folder. Don't run test builds with that
 folder as working directory; it holds the user's real saves.
 
