@@ -5,8 +5,8 @@ Status as of 2026-10-08 (third session). Written for the next agent picking this
 
 ## Where things are
 
-- Branch: **`feat/rain`**, **not merged into `master` yet**. The user is play-testing it; merge when they say so
-  (fast-forward or merge commit, then push `master`).
+- Branch: **`feat/rain`**, merged into `master` (fast-forward) on 2026-10-08 at the user's request and pushed.
+  New rain work can continue on `master` or a fresh branch.
 - The user's play folder `D:\GothicDev\OpenGothic-play` runs `feat/rain@62f9635d` (see `BUILD.txt` there; the play build was made from `ea2b8bce`, same content).
   It holds the user's real saves; never use it as a working directory for automated runs. `save game` typed in the
   console there overwrites `save_slot_1.sav`, the first menu slot.
@@ -148,10 +148,9 @@ Looking out of a cave (`ff6b424f`) was confirmed by the user in play.
 
 ## Suggested next steps (in order)
 
-1. **Merge round** (the user expects it soon): skip the Linux CI jobs in the fork first (`if: false` on `linux` and
-   `linux-deb` in `.github/workflows/build.yml`, user asked for Windows and macOS only; `release` needs them but
-   only runs on tags), list that under "Deliberate differences from upstream" in `AGENTS.md`, then merge
-   `feat/rain` into `master`, push (CI runs on push to master) and redeploy the play folder.
+1. **Check the CI run of the merge** (push to `master`). The user decided to keep all jobs, Linux included; the
+   earlier Linux hang was a GitHub mirror problem. The fork is public, so Actions minutes are free.
+   Sunrise (about 04:45) has not been checked for a flash like the one fixed at dusk.
 2. **Tuning from user feedback**: wet darkening (0.3) and sheen (0.12) in `shader/lighting/rain_wet.frag`, wetting
    and drying times in `Weather::tickWetness`, overcast brightness (`rainOvercast` in `shader/sky/clouds.glsl`), haze amount
    (0.6 in `rainClouds`, `shader/sky/sky_common.glsl`), splash rate/size/alpha, drop count.
