@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "world/objects/pfxemitter.h"
 #include "game/gametime.h"
@@ -31,6 +32,19 @@ class Weather final {
     // one line for the 'weather' console command: today's window as clock times, weight, shelter
     std::string statusLine() const;
 
+    // wet surfaces: wetness 0..1 (follows the rain, dries slowly) and the rain map, the height of the topmost
+    // static surface per cell around the camera (shader/lighting/rain_wet.frag)
+    struct RainMap {
+      int32_t            ox = 0, oz = 0;  // cell index of the (0,0) corner
+      std::vector<float> height;          // size*size; Unknown = not traced yet, Open = nothing hit
+      };
+    static constexpr int32_t RainMapSize = 64;
+    static constexpr float   RainMapCell = 100.f;
+    static constexpr float   Unknown     = 1e8f;
+    static constexpr float   Open        = -1e8f;
+    float          wetness() const { return wet; }
+    const RainMap& rainMap() const { return map; }
+
     void  save(Serialize& fout) const;
     void  load(Serialize& fin);
 
@@ -42,6 +56,7 @@ class Weather final {
     void  rollRain();
     void  tickFx(uint64_t dt);
     void  tickWind(ParticleFx& fx, uint64_t dt);
+    void  tickWetness(const Tempest::Vec3& camera, uint64_t dt);
     bool  isSheltered(const Tempest::Vec3& pos) const;
 
     static ParticleFx& rainParticles();
@@ -67,4 +82,8 @@ class Weather final {
     Tempest::SoundEffect sound;
     PfxEmitter    drops;
     PfxEmitter    splashes;
+
+    float         wet         = 0.f;
+    RainMap       map;
+    size_t        mapNext     = 0;
   };

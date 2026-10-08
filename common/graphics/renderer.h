@@ -86,6 +86,7 @@ class Renderer final {
     void drawRtsmOmni     (Tempest::Encoder<Tempest::CommandBuffer>& cmd, WorldView& view);
     void drawSwr          (Tempest::Encoder<Tempest::CommandBuffer>& cmd, WorldView& view);
     void drawGBuffer      (Tempest::Encoder<Tempest::CommandBuffer>& cmd, uint8_t fId, WorldView& view);
+    void drawRainWetness  (Tempest::Encoder<Tempest::CommandBuffer>& cmd, uint8_t fId, const WorldView& view, bool sheen);
     void drawGWater       (Tempest::Encoder<Tempest::CommandBuffer>& cmd, WorldView& view);
     void drawShadowMap    (Tempest::Encoder<Tempest::CommandBuffer>& cmd, uint8_t fId, WorldView& view);
     void drawShadowResolve(Tempest::Encoder<Tempest::CommandBuffer>& cmd, const WorldView& view);
@@ -167,6 +168,7 @@ class Renderer final {
     Tempest::Attachment       sceneDepth;
 
     Tempest::Attachment       gbufDiffuse;
+    Tempest::StorageBuffer    rainMapGpu[Resources::MaxFramesInFlight]; // fork: wet surfaces
     Tempest::Attachment       gbufNormal;
 
     struct Shadow {

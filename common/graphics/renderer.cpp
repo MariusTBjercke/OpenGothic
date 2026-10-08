@@ -663,6 +663,7 @@ void Renderer::draw(Tempest::Attachment& result, Encoder<CommandBuffer>& cmd, ui
 
   wview.visibilityPass(cmd, 1);
   drawGBuffer(cmd, fId, wview);
+  drawRainWetness(cmd, fId, wview, false);
 
   drawShadowMap(cmd, fId, wview);
   prepareEpipolar(cmd, wview);
@@ -685,6 +686,7 @@ void Renderer::draw(Tempest::Attachment& result, Encoder<CommandBuffer>& cmd, ui
   drawShadowResolve(cmd, wview);
   drawAmbient(cmd, wview);
   drawLights(cmd, wview);
+  drawRainWetness(cmd, fId, wview, true);
   drawSky(cmd, wview);
   drawLightTreeDbg(sceneLinear, cmd, wview);
 
@@ -1720,6 +1722,53 @@ void Renderer::drawGBuffer(Encoder<CommandBuffer>& cmd, uint8_t fId, WorldView& 
                       {gbufNormal,  Tempest::Vec4(), Tempest::Preserve}},
                      {zbuffer, Tempest::Preserve, Tempest::Preserve});
   view.drawGBuffer(cmd,fId);
+  }
+
+void Renderer::drawRainWetness(Encoder<CommandBuffer>& cmd, uint8_t fId, const WorldView& view, bool sheen) {
+  // fork: wet surfaces where rain reaches; see shader/lighting/rain_wet.frag and Weather::tickWetness.
+  // Without 'sheen': darker albedo, right after the G-buffer. With 'sheen': sky reflection into the lit scene,
+  // the framebuffer (sceneLinear) is already set by the caller
+  auto world = Gothic::inst().world();
+  if(world==nullptr || world->weather().wetness()<=0.001f)
+    return;
+  auto& weather = world->weather();
+  auto& map     = weather.rainMap();
+  if(map.height.empty())
+    return;
+
+  auto&        buf = rainMapGpu[fId];
+  const size_t sz  = map.height.size()*sizeof(float);
+  if(sheen) {
+    if(buf.byteSize()!=sz)
+      return; // uploaded by the albedo pass of this frame
+    }
+  else if(buf.byteSize()!=sz)
+    buf = Resources::device().ssbo(BufferHeap::Upload, map.height.data(), sz); else
+    buf.update(map.height.data(), 0, sz);
+
+  struct Push {
+    Vec2    origin;
+    float   cell;
+    int32_t size;
+    float   wetness;
+    } push;
+  push.origin  = Vec2(float(map.ox)*Weather::RainMapCell, float(map.oz)*Weather::RainMapCell);
+  push.cell    = Weather::RainMapCell;
+  push.size    = Weather::RainMapSize;
+  push.wetness = weather.wetness();
+
+  cmd.setDebugMarker(sheen ? "RainSheen" : "RainWetness");
+  if(!sheen)
+    cmd.setFramebuffer({{gbufDiffuse, Tempest::Preserve, Tempest::Preserve}});
+  cmd.setBinding(0, view.sceneGlobals().uboGlobal[SceneGlobals::V_Main]);
+  cmd.setBinding(1, gbufNormal, Sampler::nearest());
+  cmd.setBinding(2, zbuffer,    Sampler::nearest());
+  cmd.setBinding(3, buf);
+  if(sheen)
+    cmd.setBinding(4, sky.viewCldLut, sky.sampler);
+  cmd.setPushData(&push, sizeof(push));
+  cmd.setPipeline(sheen ? shaders.rainSheen : shaders.rainWet);
+  cmd.draw(nullptr, 0, 3);
   }
 
 void Renderer::drawGWater(Encoder<CommandBuffer>& cmd, WorldView& view) {

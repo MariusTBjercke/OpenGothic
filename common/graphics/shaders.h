@@ -48,6 +48,8 @@ class Shaders {
     Tempest::RenderPipeline  lights, lightsRq, lightsVsm;
     Tempest::RenderPipeline  directLight,  directLightSh, directLightRq;
     Tempest::RenderPipeline  ambientLight, ambientLightSsao, ambientLightSurf;
+    Tempest::RenderPipeline  rainWet;   // fork: wet surfaces, multiplies the G-buffer albedo
+    Tempest::RenderPipeline  rainSheen; // fork: wet surfaces, sky reflection added to the lit scene
 
     Tempest::ComputePipeline copyBuf;
     Tempest::ComputePipeline copyImg;

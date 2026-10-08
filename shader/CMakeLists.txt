@@ -223,6 +223,8 @@ add_shader(direct_light_rq.frag      lighting/direct_light.frag -DSHADOW_MAP -DR
 add_shader(direct_light_vsm.frag     virtual_shadow/vsm_direct_light.frag)
 
 add_shader(ambient_light.frag        lighting/ambient_light.frag)
+add_shader(rain_wet.frag             lighting/rain_wet.frag)
+add_shader(rain_sheen.frag           lighting/rain_wet.frag -DSHEEN)
 add_shader(ambient_light_ssao.frag   lighting/ambient_light.frag -DSSAO)
 add_shader(ambient_light_surf.frag   lighting/ambient_light.frag -DSSAO -DSURFEL_GI)
 

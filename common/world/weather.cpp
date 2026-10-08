@@ -229,6 +229,7 @@ void Weather::tickFx(uint64_t dt) {
   // overcast sky, haze and hidden sun in the sky/fog shaders (scene.rain)
   if(auto view = owner.view())
     view->setRainWeight(weight);
+  tickWetness(lp.pos, dt);
 
   // sound: follows the rain weight with a fixed slope, quieter indoors and under water (as the original)
   const float target = weight*(sheltered || camera.isInWater() ? 0.25f : 1.f);
@@ -288,6 +289,56 @@ void Weather::tickFx(uint64_t dt) {
     }
   else if(!splashes.isEmpty()) {
     splashes.setActive(false);
+    }
+  }
+
+void Weather::tickWetness(const Tempest::Vec3& camera, uint64_t dt) {
+  // wet in about 20 s of full rain, dry about 3 minutes after it stops
+  const float target = weight;
+  if(wet<target)
+    wet = std::min(target, wet + float(dt)/20000.f); else
+    wet = std::max(target, wet - float(dt)/180000.f);
+  if(wet<=0.f)
+    return;
+
+  auto phys = owner.physic();
+  auto view = owner.view();
+  if(phys==nullptr || view==nullptr)
+    return;
+
+  // follow the camera in whole cells, keep what was traced already
+  const int32_t n  = RainMapSize;
+  const int32_t ox = int32_t(std::floor(camera.x/RainMapCell)) - n/2;
+  const int32_t oz = int32_t(std::floor(camera.z/RainMapCell)) - n/2;
+  if(map.height.size()!=size_t(n*n)) {
+    map.height.assign(size_t(n*n), Unknown);
+    map.ox = ox;
+    map.oz = oz;
+    }
+  if(ox!=map.ox || oz!=map.oz) {
+    std::vector<float> h(size_t(n*n), Unknown);
+    for(int32_t z=0; z<n; ++z)
+      for(int32_t x=0; x<n; ++x) {
+        const int32_t sx = x + ox - map.ox;
+        const int32_t sz = z + oz - map.oz;
+        if(0<=sx && sx<n && 0<=sz && sz<n)
+          h[size_t(z*n+x)] = map.height[size_t(sz*n+sx)];
+        }
+    map.height = std::move(h);
+    map.ox     = ox;
+    map.oz     = oz;
+    }
+
+  // trace a few cells per tick: straight down from above the world mesh, the first hit is where rain lands
+  const float top = view->bbox().second.y + 100.f;
+  for(int i=0; i<256; ++i) {
+    const size_t  id = (mapNext++)%size_t(n*n);
+    const int32_t x  = int32_t(id%size_t(n));
+    const int32_t z  = int32_t(id/size_t(n));
+    const float   wx = (float(map.ox + x) + 0.5f)*RainMapCell;
+    const float   wz = (float(map.oz + z) + 0.5f)*RainMapCell;
+    const auto    hit = phys->ray(Tempest::Vec3(wx,top,wz), Tempest::Vec3(wx,camera.y-5000.f,wz));
+    map.height[id] = hit.hasCol ? hit.v.y : Open;
     }
   }
 
@@ -383,4 +434,5 @@ void Weather::save(Serialize& fout) const {
 void Weather::load(Serialize& fin) {
   fin.read(prevSkyTime,rainStart,rainStop,rainCtr,lightning,rainActive);
   weight = rainWeightAt(skyTime(owner.time()),rainStart,rainStop);
+  wet    = weight;
   }

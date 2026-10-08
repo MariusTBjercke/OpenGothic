@@ -93,6 +93,26 @@ void Shaders::compileShaders() noexcept {
   ssao                = computeShader("ssao.comp.sprv");
   ssaoBlur            = computeShader("ssao_blur.comp.sprv");
 
+  {
+  // fork: wet surfaces, multiplied into the G-buffer albedo
+  RenderState state;
+  state.setBlendSource  (RenderState::BlendMode::DstColor);
+  state.setBlendDest    (RenderState::BlendMode::Zero);
+  state.setZTestMode    (RenderState::ZTestMode::Always);
+  state.setZWriteEnabled(false);
+  auto sh = GothicShader::get("triangle.vert.sprv");
+  auto vs = device.shader(sh.data,sh.len);
+  sh      = GothicShader::get("rain_wet.frag.sprv");
+  auto fs = device.shader(sh.data,sh.len);
+  rainWet = device.pipeline(Triangles,state,vs,fs);
+
+  state.setBlendSource  (RenderState::BlendMode::One);
+  state.setBlendDest    (RenderState::BlendMode::One);
+  sh        = GothicShader::get("rain_sheen.frag.sprv");
+  fs        = device.shader(sh.data,sh.len);
+  rainSheen = device.pipeline(Triangles,state,vs,fs);
+  }
+
   directLight      = postEffect("direct_light",    RenderState::ZTestMode::NoEqual);
   directLightSh    = postEffect("direct_light_sh", RenderState::ZTestMode::NoEqual);
   if(opts.doRayQuery && device.properties().descriptors.nonUniformIndexing)
