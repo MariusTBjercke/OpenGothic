@@ -62,6 +62,8 @@ class InventoryMenu : public Tempest::Widget {
 
     void  mouseDownEvent (Tempest::MouseEvent& event) override;
     void  mouseUpEvent   (Tempest::MouseEvent& event) override;
+    void  mouseMoveEvent (Tempest::MouseEvent& event) override;
+    void  mouseDragEvent (Tempest::MouseEvent& event) override;
     void  mouseWheelEvent(Tempest::MouseEvent& event) override;
 
   private:
@@ -99,6 +101,16 @@ class InventoryMenu : public Tempest::Widget {
     size_t                    columsCount = 5;
     int32_t                   scrollDelta = 0;
 
+    // fork: mouse control ([GAME] invMouse), see docs/fork/plan-inventory.md
+    struct GridArea final {
+      Tempest::Rect           rect;
+      uint8_t                 side   = 0; // index in pageLocal: 0 - chest/trader, 1 - player
+      size_t                  wcount = 0;
+      size_t                  hcount = 0;
+      };
+    GridArea                  grids[2];
+    size_t                    gridsCount  = 0;
+
     size_t                    rowsCount() const;
 
     Tempest::Size             slotSize() const;
@@ -124,4 +136,11 @@ class InventoryMenu : public Tempest::Widget {
     void          drawGold  (Tempest::Painter& p, Npc &player, int x, int y);
     void          drawHeader(Tempest::Painter& p, std::string_view title, int x, int y);
     void          drawInfo  (Tempest::Painter& p);
+
+    bool            isMouseMode() const;
+    uint8_t         activeSide() const;
+    const Page*     sidePage(uint8_t side) const;
+    const GridArea* gridAt(const Tempest::Point& pos) const;
+    bool            selectAt(const Tempest::Point& pos);
+    void            scrollGrid(uint8_t side, int rows);
   };

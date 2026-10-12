@@ -86,6 +86,7 @@ Gothic::Gothic() {
   defaults->set("GAME", "mouseSensitivity",    0.5f);
   defaults->set("GAME", "invCatOrder",         "COMBAT,POTION,FOOD,ARMOR,MAGIC,RUNE,DOCS,OTHER,NONE");
   defaults->set("GAME", "invMaxColumns",       5);
+  defaults->set("GAME", "invMouse",            1); // fork: hover/click on inventory slots
   defaults->set("GAME", "animatedWindows",     1);
   defaults->set("GAME", "useGothic1Controls",  1);
   defaults->set("GAME", "highlightMeleeFocus", 0);

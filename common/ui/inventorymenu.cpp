@@ -104,6 +104,8 @@ void InventoryMenu::close() {
   renderer.reset(true);
   takeTimer.stop();
   state  = State::Closed;
+  gridsCount = 0;
+  setCursorShape(CursorShape::Hidden);
   }
 
 void InventoryMenu::open(Npc &pl) {
@@ -364,6 +366,14 @@ void InventoryMenu::mouseDownEvent(MouseEvent &e) {
   if(state==State::LockPicking)
     return;
 
+  if(isMouseMode() && e.button==MouseEvent::ButtonLeft) {
+    if(selectAt(e.pos()))
+      onItemAction(Item::NSLOT);
+    adjustScroll();
+    update();
+    return;
+    }
+
   if (e.button==MouseEvent::ButtonLeft)
     onItemAction(Item::NSLOT);
   else if (e.button==MouseEvent::ButtonRight)
@@ -385,6 +395,20 @@ void InventoryMenu::mouseWheelEvent(MouseEvent &e) {
 
   if(state==State::LockPicking)
     return;
+
+  if(isMouseMode()) {
+    scrollDelta += e.delta;
+    const int rows = scrollDelta/120;
+    scrollDelta %= 120;
+    if(rows!=0) {
+      auto g = gridAt(e.pos());
+      scrollGrid(g!=nullptr ? g->side : activeSide(), -rows);
+      selectAt(e.pos());
+      adjustScroll();
+      update();
+      }
+    return;
+    }
 
   scrollDelta += e.delta;
   if(scrollDelta>0) {
@@ -557,6 +581,9 @@ void InventoryMenu::drawAll(Painter &p, Npc &player, DrawPass pass) {
 
   int iy=30+34+70;
 
+  if(pass==DrawPass::Back)
+    gridsCount = 0;
+
   if(state==State::LockPicking)
     return;
 
@@ -594,6 +621,14 @@ void InventoryMenu::drawItems(Painter &p, DrawPass pass,
     p.setBrush(*tex);
     p.drawRect(x0,y,slotSize().w*wcount,slotSize().h*hcount,
                0,0,tex->w(),tex->h());
+    }
+
+  if(pass==DrawPass::Back && gridsCount<std::size(grids)) {
+    auto& g  = grids[gridsCount++];
+    g.rect   = Rect(x0,y,slotSize().w*wcount,slotSize().h*hcount);
+    g.side   = uint8_t(&sel==&pageLocal[0] ? 0 : 1);
+    g.wcount = size_t(wcount);
+    g.hcount = size_t(hcount);
     }
 
   auto   it = inv.iterator();
@@ -754,4 +789,90 @@ void InventoryMenu::drawInfo(Painter &p) {
 
 void InventoryMenu::draw(Tempest::Encoder<CommandBuffer>& cmd) {
   renderer.draw(cmd);
+  }
+
+// fork: mouse control ([GAME] invMouse), see docs/fork/plan-inventory.md
+void InventoryMenu::mouseMoveEvent(MouseEvent& e) {
+  // accepting the move keeps MainWindow from re-centering the cursor and orbiting the camera
+  if(!isMouseMode()) {
+    e.ignore();
+    return;
+    }
+  if(cursorShape()!=CursorShape::Arrow)
+    setCursorShape(CursorShape::Arrow);
+  if(selectAt(e.pos()))
+    update();
+  }
+
+void InventoryMenu::mouseDragEvent(MouseEvent& e) {
+  // no hover while a button is held: holding the button keeps taking from the clicked slot
+  if(!isMouseMode())
+    e.ignore();
+  }
+
+bool InventoryMenu::isMouseMode() const {
+  if(player==nullptr || state==State::Closed || state==State::LockPicking)
+    return false;
+  return Gothic::settingsGetI("GAME","invMouse")!=0;
+  }
+
+uint8_t InventoryMenu::activeSide() const {
+  if(pageOth!=nullptr)
+    return uint8_t(page==0 ? 0 : 1);
+  return 1;
+  }
+
+const InventoryMenu::Page* InventoryMenu::sidePage(uint8_t side) const {
+  return side==0 ? pageOth.get() : pagePl.get();
+  }
+
+const InventoryMenu::GridArea* InventoryMenu::gridAt(const Point& pos) const {
+  for(size_t i=0; i<gridsCount; ++i)
+    if(grids[i].rect.contains(pos))
+      return &grids[i];
+  return nullptr;
+  }
+
+bool InventoryMenu::selectAt(const Point& pos) {
+  auto g  = gridAt(pos);
+  auto pg = g!=nullptr ? sidePage(g->side) : nullptr;
+  if(pg==nullptr || g->wcount==0 || g->hcount==0)
+    return false;
+
+  const size_t col = std::min(size_t((pos.x-g->rect.x)/slotSize().w), g->wcount-1);
+  const size_t row = std::min(size_t((pos.y-g->rect.y)/slotSize().h), g->hcount-1);
+  auto&        sel = pageLocal[g->side];
+  const size_t id  = (sel.scroll+row)*g->wcount + col;
+  if(id>=pg->size())
+    return false;
+
+  const uint8_t prevPage = page;
+  const size_t  prevSel  = sel.sel;
+  if(pageOth!=nullptr)
+    page = g->side;
+  sel.sel = id;
+  return page!=prevPage || sel.sel!=prevSel;
+  }
+
+void InventoryMenu::scrollGrid(uint8_t side, int rows) {
+  auto pg = sidePage(side);
+  if(pg==nullptr || rows==0)
+    return;
+
+  auto&        sel       = pageLocal[side];
+  const size_t size      = pg->size();
+  const size_t total     = (size+columsCount-1)/columsCount;
+  const size_t visible   = rowsCount();
+  const size_t maxScroll = total>visible ? total-visible : 0;
+  const size_t prev      = sel.scroll;
+  sel.scroll = size_t(std::clamp<int64_t>(int64_t(prev)+rows, 0, int64_t(maxScroll)));
+
+  // move the selection along, otherwise adjustScroll() scrolls back to it
+  if(sel.scroll>prev)
+    sel.sel += (sel.scroll-prev)*columsCount;
+  else if(sel.sel>=(prev-sel.scroll)*columsCount)
+    sel.sel -= (prev-sel.scroll)*columsCount;
+  else
+    sel.sel = 0;
+  sel.sel = std::min(sel.sel, std::max<size_t>(size,1)-1);
   }
