@@ -131,6 +131,10 @@ Keep these when merging upstream changes:
 - **Weather / rain** (fork): `common/world/weather.*`, owned by `World` (`world.weather()`). Reference behavior of
   the original and current status in `docs/fork/research/rain.md`; open checks, gotchas and next steps in
   `docs/fork/handoff-rain.md`. Lighting hook in `shader/lighting/sky_exposure.comp` (push constant `rain`).
+- **Inventory UI** (fork, in progress): mouse control and category tabs in `common/ui/inventorymenu.*`. Goal,
+  design and phase checklist in `docs/fork/plan-inventory.md`; status and next step in
+  `docs/fork/handoff-inventory.md`. Inventory, dialog choices and HUD are OpenGothic C++ (hardcoded in the original
+  exe too); only the main/options/save/status menus come from Daedalus scripts (`gamemenu.cpp`).
 - **Run console commands at startup** (fork): `-marvin "set time 13 0;zstartrain 0.5"` executes `;`-separated
   marvin commands after the first frame that drew the world (`MainWindow::runStartupMarvinCmds`, called from
   `render`) and logs `marvin: "<cmd>"` or `marvin: "<cmd>" failed`; what a command prints is logged as
