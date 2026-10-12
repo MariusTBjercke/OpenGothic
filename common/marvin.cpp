@@ -148,6 +148,8 @@ Marvin::Marvin() {
     {"toggle inertiatarget",       C_ToggleInertia},
     {"ztoggle timedemo",           C_ZToggleTimeDemo},
     {"insert %c",                  C_Insert},
+    {"give %c %d",                 C_Give},
+    {"give %c",                    C_Give},
 
     {"toggle gi",                  C_ToggleGI},
     {"toggle vsm",                 C_ToggleVsm},
@@ -471,6 +473,17 @@ bool Marvin::exec(std::string_view v) {
         return false;
       return addItemOrNpcBySymbolName(world, ret.argv[0], player->position());
       }
+    case C_Give: {
+      // fork: put an item straight into the player's inventory ("insert" drops it in the world)
+      World* world  = Gothic::inst().world();
+      Npc*   player = Gothic::inst().player();
+      if(world==nullptr || player==nullptr)
+        return false;
+      size_t count = 1;
+      if(!ret.argv[1].empty() && (!fromString(ret.argv[1], count) || count==0))
+        return false;
+      return giveItemBySymbolName(*world, *player, ret.argv[0], count);
+      }
     case C_SetTime: {
       World* world = Gothic::inst().world();
       if(world==nullptr)
@@ -542,6 +555,23 @@ bool Marvin::addItemOrNpcBySymbolName(World* world, std::string_view name, const
   if(cls->name()=="C_ITEM")
     return (world->addItem(id, at)!=nullptr);
   return false;
+  }
+
+bool Marvin::giveItemBySymbolName(World& world, Npc& player, std::string_view name, size_t count) {
+  auto&  sc  = world.script();
+  size_t id  = sc.findSymbolIndex(name);
+  if(id==size_t(-1))
+    return false;
+
+  const auto* cls = sc.findSymbol(id);
+  if(cls==nullptr || cls->type()!=zenkit::DaedalusDataType::INSTANCE || cls->address()==0)
+    return false;
+  while(cls!=nullptr && cls->parent()!=uint32_t(-1)) {
+    cls = sc.findSymbol(cls->parent());
+    }
+  if(cls==nullptr || cls->name()!="C_ITEM")
+    return false;
+  return player.addItem(id, count)!=nullptr;
   }
 
 bool Marvin::printVariable(World* world, std::string_view name) {
