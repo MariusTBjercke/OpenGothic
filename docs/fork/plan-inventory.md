@@ -65,21 +65,23 @@ All of it is OpenGothic C++, not Daedalus script (in the original it is hardcode
 
 ### Phase 1: mouse control (equip, chest, trade, ransack)
 
-- [ ] Option `[GAME] invMouse` (default 1).
-- [ ] While the inventory is open in mouse mode: cursor visible, `MainWindow::processMouse` does not warp it, the
+- [x] Option `[GAME] invMouse` (default 1).
+- [x] While the inventory is open in mouse mode: cursor visible, `MainWindow::processMouse` does not warp it, the
       camera does not orbit. Restore on close (also on world change, death, dialog start).
-- [ ] Hover selects the slot under the cursor; in chest/trade/ransack hovering the other grid switches `page`.
+- [x] Hover selects the slot under the cursor; in chest/trade/ransack hovering the other grid switches `page`.
       Only on mouse move, so keyboard navigation keeps working.
-- [ ] Left click on a slot = `onItemAction` for that slot (equip/use, take/sell one; holding repeats via
+- [x] Left click on a slot = `onItemAction` for that slot (equip/use, take/sell one; holding repeats via
       `takeTimer` as now). Click outside any slot does nothing.
-- [ ] Right click: keep "close" (vanilla).
-- [ ] Wheel scrolls the grid (`PageLocal::scroll`) instead of moving the selection; the slot under the cursor
+- [x] Right click: keep "close" (vanilla).
+- [x] Wheel scrolls the grid (`PageLocal::scroll`) instead of moving the selection; the slot under the cursor
       becomes the selection.
-- [ ] Check fullscreen and `-window`, and different `interfaceScale` / `inventoryCellSize`.
+- [ ] User check in game: fullscreen and `-window`, chest, trade, ransack, different `interfaceScale` /
+      `inventoryCellSize`.
 
-Things to verify first: whether `InventoryMenu` receives `mouseMoveEvent` / `mouseDragEvent` once it overrides
-them (Tempest routes to the child widget under the cursor), and whether its cursor shape wins over the
-`MainWindow` one set in `MainWindow::setFullscreen`.
+How it works (Tempest): mouse moves go to the widget under the cursor that accepts them, and that widget's cursor
+shape is shown. `InventoryMenu::mouseMoveEvent` accepts while in mouse mode, so `MainWindow::mouseMoveEvent`
+(cursor warp, camera delta) never sees the move; when the inventory closes it ignores moves again and
+`MainWindow` gets them back. `mouseDragEvent` is swallowed so holding the button does not hover other slots.
 
 ### Phase 2: category tabs in the player inventory (equip mode)
 

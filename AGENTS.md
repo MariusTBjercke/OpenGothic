@@ -142,6 +142,8 @@ Keep these when merging upstream changes:
   commands, e.g. `"zstartrain 0.5;wait 30000;save game"`; the commands are otherwise all run in one frame, before
   the next world tick. Running them earlier, in `onWorldLoaded`, crashed `save game`:
   its screenshot is drawn before the renderer had drawn the world once.
+- **Console give** (fork): `give <instance> [count]` puts an item into the player's inventory (`insert` drops it in
+  the world). Use it with `-marvin` to fill the inventory for tests.
 - **Console save/load**: `save game` / `load game` use `save_slot_1.sav` like the original console (slot 1, not
   the quick save slot 0). `weather` (fork) prints today's rain window, weight and shelter state.
 - **Camera and look key**: `common/camera.cpp` (`tickThirdPerson`, `followTrans`, `clampRotation`), mode selection
