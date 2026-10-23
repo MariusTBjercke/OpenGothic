@@ -78,19 +78,28 @@ struct Pt {
   };
 
 // Solid glyphs are built from the painter's triangle primitive: a fan around the centroid is
-// exact for the convex and star-shaped outlines below and needs no texture.
+// exact for the convex and star-shaped outlines below and needs no texture. The fan is emitted
+// with a consistent winding: the painter culls back-facing triangles, so a polygon authored
+// clockwise would silently vanish (that is how the right page of the book went missing once).
 void fillFan(Tempest::Painter& p, const Pt* pts, size_t n) {
-  float cx = 0, cy = 0;
+  float area = 0;
+  float cx   = 0;
+  float cy   = 0;
   for(size_t i=0;i<n;++i) {
-    cx += pts[i].x;
-    cy += pts[i].y;
+    const Pt& a = pts[i];
+    const Pt& b = pts[(i+1)%n];
+    area += a.x*b.y - b.x*a.y;
+    cx   += a.x;
+    cy   += a.y;
     }
   cx /= float(n);
   cy /= float(n);
   for(size_t i=0;i<n;++i) {
     const Pt& a = pts[i];
     const Pt& b = pts[(i+1)%n];
-    p.drawTriangle(cx,cy, 0,0, a.x,a.y, 0,0, b.x,b.y, 0,0);
+    if(area>=0)
+      p.drawTriangle(cx,cy, 0,0, a.x,a.y, 0,0, b.x,b.y, 0,0); else
+      p.drawTriangle(cx,cy, 0,0, b.x,b.y, 0,0, a.x,a.y, 0,0);
     }
   }
 
@@ -174,7 +183,7 @@ void InventoryTabs::paintGlyph(Tempest::Painter& p, size_t tab, const Tempest::R
       left.add(X(3),Y(12)); left.add(X(30),Y(5)); left.add(X(30),Y(50)); left.add(X(3),Y(57));
       fillPoints(p,left);
       Points right;
-      right.add(X(61),Y(12)); right.add(X(34),Y(5)); right.add(X(34),Y(50)); right.add(X(61),Y(57));
+      right.add(X(34),Y(5)); right.add(X(61),Y(12)); right.add(X(61),Y(57)); right.add(X(34),Y(50));
       fillPoints(p,right);
       break;
       }

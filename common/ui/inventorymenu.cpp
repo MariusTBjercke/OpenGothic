@@ -1039,14 +1039,21 @@ void InventoryMenu::drawTabs(Painter& p, const Page& page, int x0, int w) {
       }
     }
 
+  // one INV_BACK panel behind the whole bar: INV_SLOT alone is translucent in the middle, so without
+  // this the world shows through the tabs (and only the empty ones, which used INV_BACK, looked solid)
+  if(tex!=nullptr) {
+    p.setBrush(*tex);
+    p.drawRect(x0, by, tw*int(cnt) + gap*int(cnt-1), bh, 0,0,tex->w(),tex->h());
+    }
+
   int x = x0;
   for(size_t t=0; t<cnt; ++t) {
     const Rect r(x,by,tw,bh);
     const bool active = t==tabs.active();
     const bool hover  = int8_t(t)==tabHover;
-    if(tex!=nullptr && slot!=nullptr && selT!=nullptr) {
-      // the active tab is the bordered one; hovering only brightens the glyph
-      p.setBrush(active ? *selT : (has[t] ? *slot : *tex));
+    if(slot!=nullptr && selT!=nullptr) {
+      // every tab looks like a grid cell; the active one is the bordered slot, empty ones only dim the glyph
+      p.setBrush(active ? *selT : *slot);
       p.drawRect(r.x,r.y,r.w,r.h, 0,0,slot->w(),slot->h());
       }
 
