@@ -131,8 +131,9 @@ Keep these when merging upstream changes:
 - **Weather / rain** (fork): `common/world/weather.*`, owned by `World` (`world.weather()`). Reference behavior of
   the original and current status in `docs/fork/research/rain.md`; open checks, gotchas and next steps in
   `docs/fork/handoff-rain.md`. Lighting hook in `shader/lighting/sky_exposure.comp` (push constant `rain`).
-- **Inventory UI** (fork, in progress): mouse control and category tabs in `common/ui/inventorymenu.*`. Goal,
-  design and phase checklist in `docs/fork/plan-inventory.md`; status and next step in
+- **Inventory UI** (fork, in progress): mouse-first controls, category tabs and a take-all button in
+  `common/ui/inventorymenu.*` plus `common/ui/inventorytabs.*`; `[GAME] invMouse` / `[GAME] invTabs` switch them.
+  Goal, design and iteration checklist in `docs/fork/plan-inventory.md`; status and next step in
   `docs/fork/handoff-inventory.md`. Inventory, dialog choices and HUD are OpenGothic C++ (hardcoded in the original
   exe too); only the main/options/save/status menus come from Daedalus scripts (`gamemenu.cpp`).
 - **Run console commands at startup** (fork): `-marvin "set time 13 0;zstartrain 0.5"` executes `;`-separated
@@ -248,6 +249,11 @@ powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -Mode idle -Seco
 - `-ScreenshotAt "12,20"` saves `shot_<N>s.png` of the game window at those seconds. The benchmark camera path is
   deterministic, so shots at the same second from two runs show the same view: use that for before/after
   comparisons of visual changes. The window must be visible (not minimized or covered).
+- **Driving the game from a script** (fork, verified 2026-10-23): the agent's computer-use tool cannot move the
+  mouse into the game, but synthetic input works. Bring the game window to the foreground (`SetForegroundWindow`
+  on `MainWindowHandle`), then send keys with `keybd_event`, moves with `SetCursorPos` (client coordinates ->
+  `ClientToScreen`) and clicks with `mouse_event`; combine with `-ScreenshotAt` to check the result. Recipe,
+  layout formulas and the inventory coordinates are in `docs/fork/handoff-inventory.md`.
 - The script passes `-novideo` (fork flag: videos started by scripts are skipped), so a new game in `idle` mode
   starts in the world right away; `-marvin` commands wait for a drawn world frame and would otherwise wait out the
   intro. The Xardas dialog still starts a few seconds in. `goto waypoint <name>` moves the player elsewhere, e.g.
