@@ -3,6 +3,10 @@
 #include <Tempest/Painter>
 #include <Tempest/SoundEffect>
 
+#include <algorithm>
+#include <utility>
+#include <vector>
+
 #include "utils/string_frm.h"
 #include "world/objects/npc.h"
 #include "world/objects/interactive.h"
@@ -39,40 +43,47 @@ struct InventoryMenu::Page {
     }
 
   virtual bool                is(const Inventory* i) const { return i==nullptr; }
+  virtual const Inventory*    inventory() const { return nullptr; }
   virtual Inventory::Iterator iterator() const { throw std::runtime_error("index out of range");  }
   };
 
 struct InventoryMenu::InvPage : InventoryMenu::Page {
-  InvPage(const Inventory& i):inv(i){}
+  InvPage(const Inventory& i, const Inventory::ItemFilter* f):inv(i),filter(f){}
 
   bool                is(const Inventory* i) const override { return &inv==i; }
+  const Inventory*    inventory() const override { return &inv; }
   Inventory::Iterator iterator() const override {
-    return inv.iterator(Inventory::T_Inventory);
+    return inv.iterator(Inventory::T_Inventory,filter);
     }
 
-  const Inventory& inv;
+  const Inventory&                   inv;
+  const Inventory::ItemFilter*       filter = nullptr;
   };
 
 struct InventoryMenu::TradePage : InventoryMenu::Page {
-  TradePage(const Inventory& i):inv(i){}
+  TradePage(const Inventory& i, const Inventory::ItemFilter* f):inv(i),filter(f){}
 
   bool                is(const Inventory* i) const override { return &inv==i; }
+  const Inventory*    inventory() const override { return &inv; }
   Inventory::Iterator iterator() const override {
-    return inv.iterator(Inventory::T_Trade);
+    return inv.iterator(Inventory::T_Trade,filter);
     }
 
-  const Inventory& inv;
+  const Inventory&                   inv;
+  const Inventory::ItemFilter*       filter = nullptr;
   };
 
 struct InventoryMenu::RansackPage : InventoryMenu::Page {
-  RansackPage(const Inventory& i):inv(i){}
+  RansackPage(const Inventory& i, const Inventory::ItemFilter* f):inv(i),filter(f){}
 
   bool                is(const Inventory* i) const override { return &inv==i; }
+  const Inventory*    inventory() const override { return &inv; }
   Inventory::Iterator iterator() const override {
-    return inv.iterator(Inventory::T_Ransack);
+    return inv.iterator(Inventory::T_Ransack,filter);
     }
 
-  const Inventory& inv;
+  const Inventory&                   inv;
+  const Inventory::ItemFilter*       filter = nullptr;
   };
 
 InventoryMenu::InventoryMenu(const KeyCodec& key)
@@ -105,7 +116,11 @@ void InventoryMenu::close() {
   takeTimer.stop();
   state  = State::Closed;
   gridsCount = 0;
-  setCursorShape(CursorShape::Hidden);
+  tabAreasCount = 0;
+  tabHover = -1;
+  takeAll.valid = false;
+  takeAllHover  = false;
+  updateCursor();
   }
 
 void InventoryMenu::open(Npc &pl) {
@@ -122,10 +137,12 @@ void InventoryMenu::open(Npc &pl) {
   trader = nullptr;
   chest  = nullptr;
   page   = 0;
-  pagePl .reset(new InvPage  (pl.inventory()));
+  pagePl .reset(new InvPage  (pl.inventory(), inventoryFilter()));
   pageOth.reset();
+  pageLocal[1] = tabLocal[tabs.active()];
   adjustScroll();
   update();
+  updateCursor();
 
   Gothic::inst().emitGlobalSound("INV_OPEN");
   //Gothic::inst().emitGlobalSound("INV_CHANGE");
@@ -139,10 +156,12 @@ void InventoryMenu::trade(Npc &pl, Npc &tr) {
   trader = &tr;
   chest  = nullptr;
   page   = 0;
-  pagePl .reset(new InvPage  (pl.inventory()));
-  pageOth.reset(new TradePage(tr.inventory()));
+  pagePl .reset(new InvPage  (pl.inventory(), inventoryFilter()));
+  pageOth.reset(new TradePage(tr.inventory(), nullptr));
+  pageLocal[1] = tabLocal[tabs.active()];
   adjustScroll();
   update();
+  updateCursor();
   Gothic::inst().emitGlobalSound("TRADE_OPEN");
   }
 
@@ -157,10 +176,12 @@ bool InventoryMenu::ransack(Npc &pl, Npc &tr) {
   trader = &tr;
   chest  = nullptr;
   page   = 0;
-  pagePl .reset(new InvPage    (pl.inventory()));
-  pageOth.reset(new RansackPage(tr.inventory()));
+  pagePl .reset(new InvPage    (pl.inventory(), inventoryFilter()));
+  pageOth.reset(new RansackPage(tr.inventory(), nullptr));
+  pageLocal[1] = tabLocal[tabs.active()];
   adjustScroll();
   update();
+  updateCursor();
   Gothic::inst().emitGlobalSound("INV_OPEN");
   return true;
   }
@@ -182,10 +203,12 @@ void InventoryMenu::open(Npc &pl, Interactive &ch) {
   trader = nullptr;
   chest  = &ch;
   page   = 0;
-  pagePl .reset(new InvPage(pl.inventory()));
-  pageOth.reset(new InvPage(ch.inventory()));
+  pagePl .reset(new InvPage(pl.inventory(), inventoryFilter()));
+  pageOth.reset(new InvPage(ch.inventory(), nullptr));
+  pageLocal[1] = tabLocal[tabs.active()];
   adjustScroll();
   update();
+  updateCursor();
   }
 
 InventoryMenu::State InventoryMenu::isOpen() const {
@@ -339,6 +362,9 @@ void InventoryMenu::keyDownEvent(KeyEvent &e) {
     takeTimer.start(200);
     onTakeStuff();
     }
+  else if(isTabsMode() && (e.key==KeyEvent::K_PageUp || e.key==KeyEvent::K_PageDown)) {
+    cycleTab(e.key==KeyEvent::K_PageDown ? +1 : -1);
+    }
 
   adjustScroll();
   update();
@@ -367,6 +393,18 @@ void InventoryMenu::mouseDownEvent(MouseEvent &e) {
     return;
 
   if(isMouseMode() && e.button==MouseEvent::ButtonLeft) {
+    // tabs and the take-all button come first: they are drawn in the same pass as the grids
+    if(const int8_t t = tabAt(e.pos()); t>=0) {
+      switchTab(size_t(t));
+      update();
+      return;
+      }
+    if(takeAll.valid && takeAll.rect.contains(e.pos())) {
+      takeAllItems();
+      update();
+      return;
+      }
+    // act on the slot under the cursor, also when hover already selected it
     if(selectAt(e.pos()))
       onItemAction(Item::NSLOT);
     adjustScroll();
@@ -401,9 +439,13 @@ void InventoryMenu::mouseWheelEvent(MouseEvent &e) {
     const int rows = scrollDelta/120;
     scrollDelta %= 120;
     if(rows!=0) {
-      auto g = gridAt(e.pos());
-      scrollGrid(g!=nullptr ? g->side : activeSide(), -rows);
-      selectAt(e.pos());
+      if((e.modifier & Event::M_Shift)!=0 || tabAt(e.pos())>=0) {
+        cycleTab(rows>0 ? -1 : +1);
+        } else {
+        auto g = gridAt(e.pos());
+        scrollGrid(g!=nullptr ? g->side : activeSide(), -rows);
+        selectAt(e.pos());
+        }
       adjustScroll();
       update();
       }
@@ -424,8 +466,18 @@ void InventoryMenu::mouseWheelEvent(MouseEvent &e) {
   }
 
 size_t InventoryMenu::rowsCount() const {
-  int iy=30+34+70;
-  return size_t((h()-iy-infoHeight()-20)/slotSize().h);
+  const int iy = gridTop();
+  return size_t(std::max(1,(h()-iy-infoHeight()-int(20*Gothic::interfaceScale(this)))/slotSize().h));
+  }
+
+// fork: fixed offsets used to be raw pixels, which breaks the layout on a high-DPI window
+// (the header overlapped the top row). Scale them like the cells and the font.
+int InventoryMenu::gridTop() const {
+  return int(134*Gothic::interfaceScale(this));
+  }
+
+int InventoryMenu::padd() const {
+  return int(43*Gothic::interfaceScale(this));
   }
 
 void InventoryMenu::paintEvent(PaintEvent &e) {
@@ -577,12 +629,15 @@ void InventoryMenu::adjustScroll() {
   }
 
 void InventoryMenu::drawAll(Painter &p, Npc &player, DrawPass pass) {
-  const int padd = 43;
+  const int padd = this->padd();
+  const int iy   = gridTop();
+  const int hy   = int(70*Gothic::interfaceScale(this));
 
-  int iy=30+34+70;
-
-  if(pass==DrawPass::Back)
-    gridsCount = 0;
+  if(pass==DrawPass::Back) {
+    gridsCount    = 0;
+    tabAreasCount = 0;
+    takeAll.valid = false;
+    }
 
   if(state==State::LockPicking)
     return;
@@ -591,21 +646,29 @@ void InventoryMenu::drawAll(Painter &p, Npc &player, DrawPass pass) {
   const int hcount = int(rowsCount());
 
   if(chest!=nullptr){
-    if(pass==DrawPass::Back)
-      drawHeader(p,chest->displayName(),padd,70);
+    if(pass==DrawPass::Back) {
+      drawHeader(p,chest->displayName(),padd,hy);
+      drawTakeAll(p,padd,hy,wcount*slotSize().w);
+      }
     drawItems(p,pass,*pageOth,pageLocal[0],padd,iy,wcount,hcount);
     }
 
   if(trader!=nullptr) {
-    if(pass==DrawPass::Back)
-      drawHeader(p,trader->displayName(),padd,70);
+    if(pass==DrawPass::Back) {
+      drawHeader(p,trader->displayName(),padd,hy);
+      if(state==State::Ransack)
+        drawTakeAll(p,padd,hy,wcount*slotSize().w);
+      }
     drawItems(p,pass,*pageOth,pageLocal[0],padd,iy,wcount,hcount);
     }
 
   if(state!=State::Ransack) {
-    if(pass==DrawPass::Back)
-      drawGold (p,player,w()-padd-2*slotSize().w,70);
-    drawItems(p,pass,*pagePl,pageLocal[1],w()-padd-wcount*slotSize().w,iy,wcount,hcount);
+    const int plX = w()-padd-wcount*slotSize().w;
+    if(pass==DrawPass::Back) {
+      drawGold (p,player,w()-padd-2*slotSize().w,hy);
+      drawTabs (p,*pagePl,plX,wcount*slotSize().w);
+      }
+    drawItems(p,pass,*pagePl,pageLocal[1],plX,iy,wcount,hcount);
     }
 
   if(pass==DrawPass::Back)
@@ -800,7 +863,14 @@ void InventoryMenu::mouseMoveEvent(MouseEvent& e) {
     }
   if(cursorShape()!=CursorShape::Arrow)
     setCursorShape(CursorShape::Arrow);
-  if(selectAt(e.pos()))
+
+  const int8_t tab   = tabAt(e.pos());
+  const bool   take  = takeAll.valid && takeAll.rect.contains(e.pos());
+  bool         dirty = tab!=tabHover || take!=takeAllHover;
+  tabHover     = tab;
+  takeAllHover = take;
+
+  if(selectAt(e.pos()) || dirty)
     update();
   }
 
@@ -846,12 +916,12 @@ bool InventoryMenu::selectAt(const Point& pos) {
   if(id>=pg->size())
     return false;
 
-  const uint8_t prevPage = page;
-  const size_t  prevSel  = sel.sel;
   if(pageOth!=nullptr)
     page = g->side;
   sel.sel = id;
-  return page!=prevPage || sel.sel!=prevSel;
+  // true = there is an item under the cursor (not "the selection changed"): hover selects
+  // first, and a click after hover must still act on that slot
+  return true;
   }
 
 void InventoryMenu::scrollGrid(uint8_t side, int rows) {
@@ -875,4 +945,150 @@ void InventoryMenu::scrollGrid(uint8_t side, int rows) {
   else
     sel.sel = 0;
   sel.sel = std::min(sel.sel, std::max<size_t>(size,1)-1);
+  }
+
+// fork: category tabs ([GAME] invTabs) and take-all, see docs/fork/plan-inventory.md
+bool InventoryMenu::isTabsMode() const {
+  if(player==nullptr || state==State::Closed || state==State::LockPicking)
+    return false;
+  return Gothic::settingsGetI("GAME","invTabs")!=0;
+  }
+
+const Inventory::ItemFilter* InventoryMenu::inventoryFilter() const {
+  if(Gothic::settingsGetI("GAME","invTabs")==0)
+    return nullptr;
+  return tabs.filter();
+  }
+
+int8_t InventoryMenu::tabAt(const Point& pos) const {
+  for(size_t i=0; i<tabAreasCount; ++i)
+    if(tabAreas[i].rect.contains(pos))
+      return int8_t(tabAreas[i].tab);
+  return -1;
+  }
+
+void InventoryMenu::switchTab(size_t tab) {
+  if(!isTabsMode() || tab>=InventoryTabs::Count || tab==tabs.active())
+    return;
+
+  tabLocal[tabs.active()] = pageLocal[1];
+  tabs.setActive(tab);
+  pageLocal[1] = tabLocal[tab];
+
+  if(pageOth!=nullptr)
+    page = 1; // the tab bar belongs to the player grid
+  adjustScroll();
+  }
+
+void InventoryMenu::cycleTab(int dir) {
+  if(!isTabsMode() || dir==0)
+    return;
+  const int cnt = int(InventoryTabs::Count);
+  const int id  = (int(tabs.active()) + cnt + dir%cnt) % cnt;
+  switchTab(size_t(id));
+  }
+
+void InventoryMenu::takeAllItems() {
+  if(pageOth==nullptr || player==nullptr)
+    return;
+  if(state!=State::Chest && state!=State::Ransack)
+    return;
+
+  // collect first: moving items invalidates the iterator
+  std::vector<std::pair<size_t,size_t>> items;
+  for(auto it = pageOth->iterator(); it.isValid(); ++it)
+    items.emplace_back(it->clsId(), it.count());
+  for(auto& i:items) {
+    if(state==State::Chest && chest!=nullptr)
+      player->addItem(i.first, *chest, i.second);
+    else if(state==State::Ransack && trader!=nullptr)
+      player->addItem(i.first, *trader, i.second);
+    }
+  adjustScroll();
+  }
+
+void InventoryMenu::updateCursor() {
+  // Only the hovered widget's shape reaches the OS cursor (Tempest applies it in
+  // EventDispatcher::implSetMouseOver), so this is a best-effort hint: the arrow appears on the
+  // first mouse move over the grid, which is exactly when the player can act.
+  const bool arrow = isMouseMode();
+  setCursorShape(arrow ? CursorShape::Arrow : CursorShape::Hidden);
+  }
+
+void InventoryMenu::drawTabs(Painter& p, const Page& page, int x0, int w) {
+  if(!isTabsMode())
+    return;
+
+  const float scale = Gothic::interfaceScale(this);
+  auto&       fnt   = Resources::font(scale);
+  const int   gap   = int(4*scale);
+  const int   pad   = int(8*scale);
+  // the free band between the header row and the grid: draw the bar into it, never over the header
+  const int   by    = int(70*scale) + int(34*scale) + int(2*scale);
+  const int   bh    = gridTop() - by - int(2*scale);
+  if(bh<fnt.pixelSize())
+    return;
+
+  // per-tab item counts drive the "empty tab" look; count on the unfiltered inventory
+  size_t counts[InventoryTabs::Count] = {};
+  if(const Inventory* inv = page.inventory(); inv!=nullptr) {
+    for(auto it = inv->iterator(Inventory::T_Inventory); it.isValid(); ++it)
+      for(size_t t=0; t<InventoryTabs::Count; ++t)
+        if(InventoryTabs::matches(t,*it))
+          counts[t]++;
+    }
+
+  int widths[InventoryTabs::Count] = {};
+  int total = 0;
+  for(size_t t=0; t<InventoryTabs::Count; ++t) {
+    widths[t] = std::max(fnt.textSize(InventoryTabs::label(t)).w + 2*pad, int(34*scale));
+    total    += widths[t] + (t>0 ? gap : 0);
+    }
+
+  int x = std::max(x0 + w - total, padd());
+  for(size_t t=0; t<InventoryTabs::Count; ++t) {
+    Rect r(x,by,widths[t],bh);
+    const bool active = t==tabs.active();
+    const bool hover  = int8_t(t)==tabHover;
+    if(tex!=nullptr && slot!=nullptr && selT!=nullptr) {
+      if(active || hover)
+        p.setBrush(*selT); else if(counts[t]!=0)
+        p.setBrush(*slot); else
+        p.setBrush(*tex);
+      p.drawRect(r.x,r.y,r.w,r.h, 0,0,tex->w(),tex->h());
+      }
+    const auto& tf = counts[t]!=0 ? fnt : Resources::font(Resources::FontType::Disabled,scale);
+    const auto  sz = tf.textSize(InventoryTabs::label(t));
+    tf.drawText(p, r.x+(r.w-sz.w)/2, r.y+r.h/2+sz.h/2, InventoryTabs::label(t));
+    if(tabAreasCount<std::size(tabAreas))
+      tabAreas[tabAreasCount++] = TabArea{r,uint8_t(t)};
+    x += widths[t] + gap;
+    }
+  }
+
+void InventoryMenu::drawTakeAll(Painter& p, int x, int y, int w) {
+  if(state!=State::Chest && state!=State::Ransack)
+    return;
+  if(pageOth==nullptr || pageOth->size()==0)
+    return;
+
+  const float scale = Gothic::interfaceScale(this);
+  auto&       fnt   = Resources::font(scale);
+  const int   pad   = int(8*scale);
+  const int   bh    = int(34*scale);
+  const int   bw    = fnt.textSize("Take all").w + 2*pad;
+  Rect r(x+w-bw, y, bw, bh);
+
+  if(tex!=nullptr) {
+    p.setBrush(*tex);
+    p.drawRect(r.x,r.y,r.w,r.h, 0,0,tex->w(),tex->h());
+    }
+  if(selT!=nullptr && takeAllHover) {
+    p.setBrush(*selT);
+    p.drawRect(r.x,r.y,r.w,r.h, 0,0,selT->w(),selT->h());
+    }
+  const auto sz = fnt.textSize("Take all");
+  fnt.drawText(p, r.x+(r.w-sz.w)/2, r.y+r.h/2+sz.h/2, "Take all");
+  takeAll.rect  = r;
+  takeAll.valid = true;
   }

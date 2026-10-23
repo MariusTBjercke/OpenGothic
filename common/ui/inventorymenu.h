@@ -6,6 +6,7 @@
 
 #include "graphics/inventoryrenderer.h"
 #include "game/inventory.h"
+#include "ui/inventorytabs.h"
 
 class Npc;
 class Item;
@@ -13,6 +14,7 @@ class Inventory;
 class Interactive;
 class World;
 class KeyCodec;
+namespace Tempest { class Window; }
 
 class InventoryMenu : public Tempest::Widget {
   public:
@@ -77,6 +79,16 @@ class InventoryMenu : public Tempest::Widget {
       size_t                  scroll = 0;
       };
 
+    struct TabArea final {
+      Tempest::Rect           rect;
+      uint8_t                 tab  = 0;
+      };
+
+    struct ActionArea final {
+      Tempest::Rect           rect;
+      bool                    valid = false;
+      };
+
     const KeyCodec&           keycodec;
 
     const Tempest::Texture2d* tex =nullptr;
@@ -111,7 +123,18 @@ class InventoryMenu : public Tempest::Widget {
     GridArea                  grids[2];
     size_t                    gridsCount  = 0;
 
+    // fork: category tabs ([GAME] invTabs) and take-all button
+    InventoryTabs             tabs;
+    TabArea                   tabAreas[InventoryTabs::Count];
+    size_t                    tabAreasCount = 0;
+    int8_t                    tabHover      = -1;
+    PageLocal                 tabLocal[InventoryTabs::Count];
+    ActionArea                takeAll;
+    bool                      takeAllHover  = false;
+
     size_t                    rowsCount() const;
+    int                       gridTop() const;
+    int                       padd() const;
 
     Tempest::Size             slotSize() const;
     int                       infoHeight() const;
@@ -136,11 +159,22 @@ class InventoryMenu : public Tempest::Widget {
     void          drawGold  (Tempest::Painter& p, Npc &player, int x, int y);
     void          drawHeader(Tempest::Painter& p, std::string_view title, int x, int y);
     void          drawInfo  (Tempest::Painter& p);
+    void          drawTabs  (Tempest::Painter& p, const Page& page, int x, int w);
+    void          drawTakeAll(Tempest::Painter& p, int x, int y, int w);
 
     bool            isMouseMode() const;
+    bool            isTabsMode() const;
+    auto            inventoryFilter() const -> const Inventory::ItemFilter*;
     uint8_t         activeSide() const;
     const Page*     sidePage(uint8_t side) const;
     const GridArea* gridAt(const Tempest::Point& pos) const;
     bool            selectAt(const Tempest::Point& pos);
     void            scrollGrid(uint8_t side, int rows);
+
+    int8_t          tabAt(const Tempest::Point& pos) const;
+    void            switchTab(size_t tab);
+    void            cycleTab(int dir);
+    void            takeAllItems();
+
+    void             updateCursor();
   };

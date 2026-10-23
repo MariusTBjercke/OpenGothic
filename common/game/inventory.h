@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <vector>
 #include <memory>
 #include <string_view>
@@ -33,6 +34,9 @@ class Inventory final {
       T_Ransack,
       };
 
+    // fork: optional view filter (inventory category tabs), nullptr = show everything
+    using ItemFilter = std::function<bool(const Item&)>;
+
     class Iterator {
       public:
         const Item& operator*   () const;
@@ -47,17 +51,18 @@ class Inventory final {
         bool        isValid() const;
 
       private:
-        Iterator(IteratorType t, const Inventory* owner);
+        Iterator(IteratorType t, const Inventory* owner, const ItemFilter* filter = nullptr);
         void skipHidden();
 
-        IteratorType     type  = T_Inventory;
-        const Inventory* owner = nullptr;
-        size_t           at    = 0;
-        size_t           subId = 0;
+        IteratorType            type   = T_Inventory;
+        const Inventory*        owner  = nullptr;
+        const ItemFilter*       filter = nullptr;
+        size_t                  at     = 0;
+        size_t                  subId  = 0;
       friend class Inventory;
       };
 
-    Iterator     iterator(IteratorType t) const;
+    Iterator     iterator(IteratorType t, const ItemFilter* filter = nullptr) const;
 
     int32_t      priceOf(size_t item) const;
     int32_t      sellPriceOf(size_t item) const;

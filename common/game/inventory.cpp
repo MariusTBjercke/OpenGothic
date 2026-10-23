@@ -61,22 +61,29 @@ bool Inventory::Iterator::isValid() const {
   return at<owner->items.size();
   }
 
-Inventory::Iterator::Iterator(Inventory::IteratorType t, const Inventory* owner)
-  :type(t), owner(owner) {
+Inventory::Iterator::Iterator(Inventory::IteratorType t, const Inventory* owner, const ItemFilter* filter)
+  :type(t), owner(owner), filter(filter) {
   owner->sortItems();
   skipHidden();
   }
 
 void Inventory::Iterator::skipHidden() {
   auto& it = owner->items;
-  if(type==T_Trade) {
-    while(at<it.size() && (it[at]->isEquipped() || it[at]->isGold()))
+  while(at<it.size()) {
+    auto& cur = *it[at];
+    if(type==T_Trade && (cur.isEquipped() || cur.isGold())) {
       ++at;
-    }
-  if(type==T_Ransack) {
-    while(at<it.size() && it[at]->isEquipped()) {
-      ++at;
+      continue;
       }
+    if(type==T_Ransack && cur.isEquipped()) {
+      ++at;
+      continue;
+      }
+    if(filter!=nullptr && !(*filter)(cur)) {
+      ++at;
+      continue;
+      }
+    break;
     }
   }
 
@@ -188,8 +195,8 @@ void Inventory::save(Serialize &fout) const {
   fout.write(curItem,stateItem);
   }
 
-Inventory::Iterator Inventory::iterator(IteratorType t) const {
-  return Iterator(t,this);
+Inventory::Iterator Inventory::iterator(IteratorType t, const ItemFilter* filter) const {
+  return Iterator(t,this,filter);
   }
 
 int32_t Inventory::priceOf(size_t cls) const {
