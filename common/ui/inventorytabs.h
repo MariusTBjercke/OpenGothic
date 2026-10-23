@@ -3,10 +3,12 @@
 // Fork: category tabs for the inventory, see docs/fork/plan-inventory.md.
 // Holds the category list, the active tab and the item filter used by InventoryMenu.
 
+#include <Tempest/Rect>
 #include <functional>
 #include <string_view>
 
 class Item;
+namespace Tempest { class Painter; }
 
 class InventoryTabs {
   public:
@@ -28,6 +30,10 @@ class InventoryTabs {
 
     static std::string_view label(size_t tab);
     static bool             matches(size_t tab, const Item& item);
+
+    // Draws the category glyph into a square rect, using the painter's solid primitives only
+    // (no art assets). alpha < 1 dims it, which is how empty categories are shown.
+    static void paintGlyph(Tempest::Painter& p, size_t tab, const Tempest::Rect& rect, float alpha);
 
     size_t       active() const { return activeId; }
     void         setActive(size_t tab);

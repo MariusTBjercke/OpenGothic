@@ -1019,50 +1019,48 @@ void InventoryMenu::drawTabs(Painter& p, const Page& page, int x0, int w) {
   if(!isTabsMode())
     return;
 
-  const float scale = Gothic::interfaceScale(this);
-  auto&       fnt   = Resources::font(scale);
-  const int   gap   = int(4*scale);
-  const int   pad   = int(8*scale);
-  // the free band between the header row and the grid: draw the bar into it, never over the header
-  const int   by    = int(70*scale) + int(34*scale) + int(2*scale);
-  const int   bh    = gridTop() - by - int(2*scale);
-  if(bh<fnt.pixelSize())
+  const float  scale = Gothic::interfaceScale(this);
+  const int    gap   = int(3*scale);
+  const size_t cnt   = size_t(InventoryTabs::Count);
+  // the free band between the header row and the grid: the bar lives there, exactly as wide as the grid
+  const int    by    = int(70*scale) + int(34*scale) + int(2*scale);
+  const int    bh    = gridTop() - by - int(2*scale);
+  const int    tw    = int((w - int(cnt-1)*gap) / int(cnt));
+  if(bh<=0 || tw<=0)
     return;
 
-  // per-tab item counts drive the "empty tab" look; count on the unfiltered inventory
-  size_t counts[InventoryTabs::Count] = {};
+  // empty categories keep their glyph, dimmed: an empty tab reads as "nothing here", not as a hole
+  bool has[InventoryTabs::Count] = {};
   if(const Inventory* inv = page.inventory(); inv!=nullptr) {
-    for(auto it = inv->iterator(Inventory::T_Inventory); it.isValid(); ++it)
-      for(size_t t=0; t<InventoryTabs::Count; ++t)
+    for(auto it = inv->iterator(Inventory::T_Inventory); it.isValid(); ++it) {
+      for(size_t t=0; t<cnt; ++t)
         if(InventoryTabs::matches(t,*it))
-          counts[t]++;
+          has[t] = true;
+      }
     }
 
-  int widths[InventoryTabs::Count] = {};
-  int total = 0;
-  for(size_t t=0; t<InventoryTabs::Count; ++t) {
-    widths[t] = std::max(fnt.textSize(InventoryTabs::label(t)).w + 2*pad, int(34*scale));
-    total    += widths[t] + (t>0 ? gap : 0);
-    }
-
-  int x = std::max(x0 + w - total, padd());
-  for(size_t t=0; t<InventoryTabs::Count; ++t) {
-    Rect r(x,by,widths[t],bh);
+  int x = x0;
+  for(size_t t=0; t<cnt; ++t) {
+    const Rect r(x,by,tw,bh);
     const bool active = t==tabs.active();
     const bool hover  = int8_t(t)==tabHover;
     if(tex!=nullptr && slot!=nullptr && selT!=nullptr) {
-      if(active || hover)
-        p.setBrush(*selT); else if(counts[t]!=0)
-        p.setBrush(*slot); else
-        p.setBrush(*tex);
-      p.drawRect(r.x,r.y,r.w,r.h, 0,0,tex->w(),tex->h());
+      // the active tab is the bordered one; hovering only brightens the glyph
+      p.setBrush(active ? *selT : (has[t] ? *slot : *tex));
+      p.drawRect(r.x,r.y,r.w,r.h, 0,0,slot->w(),slot->h());
       }
-    const auto& tf = counts[t]!=0 ? fnt : Resources::font(Resources::FontType::Disabled,scale);
-    const auto  sz = tf.textSize(InventoryTabs::label(t));
-    tf.drawText(p, r.x+(r.w-sz.w)/2, r.y+r.h/2+sz.h/2, InventoryTabs::label(t));
+
+    const int m = std::max(int(3*scale), std::min(tw,bh)/10);
+    const int s = std::min(tw,bh) - 2*m;
+    if(s>0) {
+      const Rect  ir(r.x+(r.w-s)/2, r.y+(r.h-s)/2, s, s);
+      const float alpha = !has[t] ? 0.28f : (active || hover ? 1.f : 0.86f);
+      InventoryTabs::paintGlyph(p, t, ir, alpha);
+      }
+
     if(tabAreasCount<std::size(tabAreas))
       tabAreas[tabAreasCount++] = TabArea{r,uint8_t(t)};
-    x += widths[t] + gap;
+    x += tw + gap;
     }
   }
 
