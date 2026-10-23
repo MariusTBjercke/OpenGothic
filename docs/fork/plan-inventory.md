@@ -93,9 +93,12 @@ All of it is OpenGothic C++, not Daedalus script (in the original it is hardcode
       a chest or a body to loot; there is no console command to open one).
 - [x] Tabs: All, Weapons, Armor, Potions, Food, Writings, Magic, Other from `mainFlag` (Weapons = `NF|FF|MUN`,
       Magic = `RUNE|MAGIC`, Other = everything else). Default All, so the first view matches vanilla.
-- [x] Tab bar above the player grid (single row, right-aligned to the grid, extends into the free middle space,
-      clamped to the left padding), active tab highlighted with `INV_SLOT_HIGHLIGHTED`, empty tabs use the
-      `Disabled` font, item count per tab is computed from the unfiltered inventory.
+- [x] Tab bar above the player grid, exactly as wide as the grid: one tab per category, **icon-only with
+      procedural glyphs** (2x2 grid, sword, shield, flask, apple, open book, star, three dots) drawn from the
+      painter's rect/triangle primitives in `InventoryTabs::paintGlyph`, no art assets. Empty categories show the
+      glyph dimmed (0.28 alpha) instead of a dark hole; active/hover use `INV_SLOT_HIGHLIGHTED`.
+      Chosen 2026-10-23 after item-model icons looked inconsistent (icons changed with the inventory content and
+      empty categories looked broken); the user approved a mockup first.
 - [x] Switch tabs: click a tab, wheel over the tab bar, Shift+wheel anywhere, `PageUp` / `PageDown`; cycling wraps.
       Verified: `PageDown` and a click on the Food tab both filter the grid (screenshots); wheel/Shift+wheel share
       the same code path but were not exercised separately.
@@ -142,7 +145,10 @@ All of it is OpenGothic C++, not Daedalus script (in the original it is hardcode
 - Search by name (needs a text field; `SavNameDialog` in `gamemenu.cpp` shows the manual key handling it takes).
 - Drag and drop between the player and the world (drop an item on the ground).
 - A list-based layout (the plugin author's newer "list inventory").
-- Icons for tabs (own textures, not the plugin's). Could reuse the item model of the first item in a category.
+- Icons for tabs: **procedural glyphs** are the current look (`InventoryTabs::paintGlyph`). Optional upgrade:
+  hand-made or AI-generated art (for example through a local Gemini/OpenAI image tool the user mentioned), which
+  needs an asset pipeline (embed at build like the shaders, or ship a `ui/` folder next to the exe and copy it in
+  `deploy-play.ps1`) and a license decision (CC0 set or generated art).
 - Mouse for dialog choices and the scripted main menu (they still require the keyboard / current selection).
 - Custom per-item categories (needs saved state, decision 6).
 
@@ -156,6 +162,9 @@ All of it is OpenGothic C++, not Daedalus script (in the original it is hardcode
 - 2026-10-23: Iteration order A -> B -> C as listed above (user choice). Defaults unless the user says
   otherwise: coarse tabs first and finer ones in C; drag takes the whole stack; right click still closes;
   tab bar horizontal and compact first; merge to `master` after the user tested phase 1.
+- 2026-10-23: Tabs are icon-only, exactly as wide as the grid, with procedural glyphs and dimmed glyphs for empty
+  categories (user picked this over text labels and over item-model icons). A generated/hand-made icon set can
+  replace the glyphs later; the drawing entry point is `InventoryTabs::paintGlyph`.
 
 ## Testability and verification
 

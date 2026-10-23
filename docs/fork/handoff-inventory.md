@@ -9,12 +9,18 @@ next.
 - Iteration A is implemented on branch `feat/inventory-ui` (not merged into `master`):
   - click after hover works (the old `selectAt` reported "selection changed", so a click on the hovered slot did
     nothing; it now reports "there is an item under the cursor"),
-  - category tabs: All / Weapons / Armor / Potions / Food / Writings / Magic / Other, clickable tab bar above the
-    player grid, `PageUp`/`PageDown`, wheel over the bar, Shift+wheel anywhere, per-tab selection/scroll memory,
-    empty tabs dimmed, `[GAME] invTabs=1`,
+  - category tabs: All / Weapons / Armor / Potions / Food / Writings / Magic / Other, as an **icon-only bar exactly
+    as wide as the player grid**: procedural glyphs (2x2 grid, sword, shield, flask, apple, open book, star, three
+    dots) drawn from painter primitives in `InventoryTabs::paintGlyph`, no art assets; empty categories show the
+    glyph dimmed. Click a tab, `PageUp`/`PageDown`, wheel over the bar, Shift+wheel anywhere, per-tab
+    selection/scroll memory, `[GAME] invTabs=1`,
   - "Take all" button in chest/ransack (header row, right-aligned to the other grid),
   - layout offsets (padding, grid top, header row) now scale with `Gothic::interfaceScale`; at 225% DPI the header
     used to overlap the top slot row, and the tab bar needs that band.
+- Icon history: the first attempt used the *item model of the first item in the category* as the tab icon. It
+  looked inconsistent (icons changed with the inventory content, empty categories were dark holes), so the user
+  approved a Pillow mockup of fixed glyphs and the glyphs replaced it the same day. A future upgrade to
+  hand-made/AI-generated art is noted in the plan backlog (needs an asset pipeline and a license decision).
 - Verified by the agent (screenshots + synthetic input, see below):
   - hover selects the slot and updates the info box,
   - a click on the hovered slot acts: apple stack went 20 -> 19,
@@ -40,10 +46,12 @@ mouse into it. Recipe that worked on 2026-10-23:
 
 1. Start the game with `scripts/smoke-test.ps1 -Mode idle -Seconds N -RunDir build\smoke-x -Marvin "goto waypoint
    NW_CITY_HABOUR_05;give ItFo_Apple 20;..." -ScreenshotAt "17,23,31"`.
-2. In a second background job, sleep ~12 s, find the window (`Get-Process Gothic2Notr` -> `MainWindowHandle`),
-   `SetForegroundWindow`, then `keybd_event(0x09)` = Tab to open the inventory, `SetCursorPos` (convert client
-   coordinates with `ClientToScreen`) to hover, `mouse_event(2/4)` to click, `keybd_event(0x22)` = PageDown,
-   `MOUSEEVENTF_WHEEL` for the wheel. Read the result from the `shot_Ns.png` files.
+2. In a second background job, sleep ~12 s, find the window (`Get-Process Gothic2Notr` -> `MainWindowHandle`), then
+   send **keys with `PostMessage`** (`WM_KEYDOWN`/`WM_KEYUP` = 0x0100/0x0101, lParam `1 | (scancode<<16)` with the
+   scancode from `MapVirtualKey`). `PostMessage` does not need focus, unlike `keybd_event`/`SendInput`, which is
+   why the earlier runs sometimes lost the Tab key to another window. Use `SetCursorPos` (client coordinates ->
+   `ClientToScreen`) for hover and `mouse_event(2/4)` for clicks, `MOUSEEVENTF_WHEEL` for the wheel; for mouse
+   input the game window must still be the one under the cursor. Read the result from the `shot_Ns.png` files.
 3. Keep timings >= 3 s apart so a screenshot falls between two inputs.
 
 Layout on the user's machine: 4K window, `Gothic::interfaceScale` = 2.25 -> cell 157, padding 96, grid top 301,
@@ -52,6 +60,20 @@ player grid at x = 2959, width 785, tab bar at y = 237, height 60. General formu
 again (done once; the code is clean now).
 
 ## Session log
+
+### 2026-10-23: icon tabs
+
+- User feedback on the first play test: the text tab bar was ~1.6x wider than the grid (8 labels vs 5 columns, the
+  same ratio at any resolution), so it floated over the world.
+- Options discussed: icon tabs (what the Union plugin does, and the only thing that scales to 15-20 categories
+  later), a vertical text rail (roomy, bigger change, also solves the shared tab for chest/trade), or clipping and
+  scrolling the bar.
+- Mocked both in Pillow (`build/mock_tabs.py`, throwaway) and the user picked fixed **glyphs** over item-model
+  icons. Implemented in `InventoryTabs::paintGlyph` with `drawRect` + triangle fans (`p.drawTriangle` with a color
+  brush); no textures, no asset pipeline.
+- Harness gotcha found here: `keybd_event` needs the game to be the foreground window and silently loses the key
+  otherwise (one run opened nothing); `PostMessage(WM_KEYDOWN/UP)` works regardless of focus and is now the
+  documented way to send keys.
 
 ### 2026-10-23: iteration A
 
