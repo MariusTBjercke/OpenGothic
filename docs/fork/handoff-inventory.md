@@ -41,18 +41,22 @@ next.
 
 ## Test harness (works, use it)
 
-Synthetic input reaches the game when the window is in the foreground, even though computer-use cannot move the
-mouse into it. Recipe that worked on 2026-10-23:
+Synthetic input reaches the game, even though computer-use cannot move the mouse into it. Recipe that worked on
+2026-10-23:
 
 1. Start the game with `scripts/smoke-test.ps1 -Mode idle -Seconds N -RunDir build\smoke-x -Marvin "goto waypoint
    NW_CITY_HABOUR_05;give ItFo_Apple 20;..." -ScreenshotAt "17,23,31"`.
-2. In a second background job, sleep ~12 s, find the window (`Get-Process Gothic2Notr` -> `MainWindowHandle`), then
-   send **keys with `PostMessage`** (`WM_KEYDOWN`/`WM_KEYUP` = 0x0100/0x0101, lParam `1 | (scancode<<16)` with the
-   scancode from `MapVirtualKey`). `PostMessage` does not need focus, unlike `keybd_event`/`SendInput`, which is
-   why the earlier runs sometimes lost the Tab key to another window. Use `SetCursorPos` (client coordinates ->
-   `ClientToScreen`) for hover and `mouse_event(2/4)` for clicks, `MOUSEEVENTF_WHEEL` for the wheel; for mouse
-   input the game window must still be the one under the cursor. Read the result from the `shot_Ns.png` files.
-3. Keep timings >= 3 s apart so a screenshot falls between two inputs.
+2. In a second background job, sleep ~18 s (at 12 s the world may still be loading and the inventory key is
+   ignored), find the window (`Get-Process Gothic2Notr` -> `MainWindowHandle`) and **activate it first**:
+   `AttachThreadInput(GetCurrentThreadId(), GetWindowThreadProcessId(GetForegroundWindow()), true)` +
+   `ShowWindow(hwnd,SW_RESTORE)` + `BringWindowToTop` + `SetForegroundWindow` + `SetActiveWindow`, or simply click
+   somewhere in the window with `mouse_event`. Tempest clears its widget focus when the window goes inactive, and
+   then it ignores keys from every source, including `PostMessage` - that is why some runs silently lost the Tab.
+3. Send keys with `PostMessage` (`WM_KEYDOWN`/`WM_KEYUP` = 0x0100/0x0101, lParam `1 | (scancode<<16)`, scancode
+   from `MapVirtualKey`) or `keybd_event`; both work once the window is active. Use `SetCursorPos` (client
+   coordinates -> `ClientToScreen`) for hover and `mouse_event(2/4)` for clicks, `MOUSEEVENTF_WHEEL` for the wheel.
+   Read the result from the `shot_Ns.png` files.
+4. Keep timings >= 3 s apart so a screenshot falls between two inputs.
 
 Layout on the user's machine: 4K window, `Gothic::interfaceScale` = 2.25 -> cell 157, padding 96, grid top 301,
 player grid at x = 2959, width 785, tab bar at y = 237, height 60. General formulas are in the plan
@@ -71,9 +75,17 @@ again (done once; the code is clean now).
 - Mocked both in Pillow (`build/mock_tabs.py`, throwaway) and the user picked fixed **glyphs** over item-model
   icons. Implemented in `InventoryTabs::paintGlyph` with `drawRect` + triangle fans (`p.drawTriangle` with a color
   brush); no textures, no asset pipeline.
+- Two follow-up fixes from the user's second look:
+  - **Transparency:** `INV_SLOT` is translucent in the middle; tabs that only had `INV_SLOT` let the world show
+    through, while the empty tabs (which used `INV_BACK`) showed its fine grid pattern. Now `INV_BACK` is drawn
+    once behind the whole bar and every tab draws `INV_SLOT` on top, exactly like a grid cell.
+  - **Winding:** the painter culls back-facing triangles, and the right page of the book was authored clockwise, so
+    it vanished. `fillFan` now normalises the winding from the polygon's signed area.
 - Harness gotcha found here: `keybd_event` needs the game to be the foreground window and silently loses the key
   otherwise (one run opened nothing); `PostMessage(WM_KEYDOWN/UP)` works regardless of focus and is now the
-  documented way to send keys.
+  documented way to send keys. Tempest clears the widget focus when the window goes inactive, so activate the
+  window first (`AttachThreadInput` + `ShowWindow(SW_RESTORE)` + `SetForegroundWindow`, or a click in the window);
+  otherwise even `PostMessage` input is ignored.
 
 ### 2026-10-23: iteration A
 
