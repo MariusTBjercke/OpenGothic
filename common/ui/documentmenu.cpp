@@ -5,6 +5,7 @@
 #include "utils/gthfont.h"
 #include "utils/keycodec.h"
 #include "gothic.h"
+#include "ui/uidraw.h"
 
 using namespace Tempest;
 
@@ -12,6 +13,18 @@ DocumentMenu::DocumentMenu(const KeyCodec& key)
   :keycodec(key) {
   setFocusPolicy(NoFocus);
   cursor = Resources::loadTexture("U.TGA");
+  if(Gothic::settingsGetI("GAME","docMouse")!=0)
+    setCursorShape(CursorShape::Arrow);
+  }
+
+void DocumentMenu::mouseDownEvent(MouseEvent& e) {
+  if(!active || Gothic::settingsGetI("GAME","docMouse")==0) {
+    e.ignore();
+    return;
+    }
+  e.accept();
+  if(e.button==MouseEvent::ButtonLeft || e.button==MouseEvent::ButtonRight)
+    close();
   }
 
 void DocumentMenu::show(const DocumentMenu::Show &doc) {
@@ -49,6 +62,12 @@ void DocumentMenu::paintEvent(PaintEvent &e) {
   if(!active)
     return;
 
+  Painter p(e);
+
+  const bool mouseMode = Gothic::settingsGetI("GAME","docMouse")!=0;
+  if(mouseMode)
+    UiDraw::scrim(p,Rect(0,0,w(),h()),0.35f);
+
   const float scale = Gothic::interfaceScale(this);
   float mw = 0, mh = 0;
   for(auto& i:document.pages){
@@ -64,7 +83,6 @@ void DocumentMenu::paintEvent(PaintEvent &e) {
   int   x  = (w()-int(k*mw))/2, y = (h()-int(mh))/2;
   auto  pl = Gothic::inst().player();
 
-  Painter p(e);
   for(auto& i:document.pages) {
     const GthFont* fnt = nullptr;
     if(i.flg&F_Font)
@@ -113,5 +131,15 @@ void DocumentMenu::paintEvent(PaintEvent &e) {
       p.popState();
       }
     x+=w;
+    }
+
+  if(mouseMode) {
+    // affordance: the window is dismissed with a click, say so instead of leaving the player guessing
+    auto& fnt = Resources::font(Resources::FontType::Disabled, scale);
+    const std::string_view hint = "Click or Esc to close";
+    const auto sz = fnt.textSize(hint);
+    const Rect r((w()-sz.w)/2-int(12*scale), h()-int(54*scale), sz.w+int(24*scale), sz.h+int(10*scale));
+    UiDraw::textPlate(p,r,0.45f);
+    UiDraw::textCenter(p,fnt,r,hint);
     }
   }

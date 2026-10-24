@@ -44,6 +44,9 @@ class DocumentMenu : public Tempest::Widget {
     void keyDownEvent(Tempest::KeyEvent &e);
     void keyUpEvent  (Tempest::KeyEvent &e);
 
+    // fork: click anywhere to close the document ([GAME] docMouse)
+    void mouseDownEvent(Tempest::MouseEvent& e) override;
+
   protected:
     void paintEvent(Tempest::PaintEvent& e);
 
