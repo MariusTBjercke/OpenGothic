@@ -1,119 +1,159 @@
-# Handoff: modern inventory (mouse-first UI, category tabs)
+# Handoff: mouse-first inventory (branch `feat/inventory-ui`)
 
-Status per session, newest first. Read `AGENTS.md`, then `docs/fork/plan-inventory.md` (goal, design,
-iteration checklist). Keep the checklist in the plan up to date; this file says where things stand and what is
-next.
+Self-contained handoff for a fresh session. Read `AGENTS.md` first, then `docs/fork/plan-inventory.md` (goal,
+design decisions, iteration checklist). This file is the current state, the next step and the things that cost time
+to rediscover. Session log at the bottom, newest first.
 
-## Current status
+## Where things stand
 
-- Iteration A is implemented on branch `feat/inventory-ui` (not merged into `master`):
-  - click after hover works (the old `selectAt` reported "selection changed", so a click on the hovered slot did
-    nothing; it now reports "there is an item under the cursor"),
-  - category tabs: All / Weapons / Armor / Potions / Food / Writings / Magic / Other, as an **icon-only bar exactly
-    as wide as the player grid**: procedural glyphs (2x2 grid, sword, shield, flask, apple, open book, star, three
-    dots) drawn from painter primitives in `InventoryTabs::paintGlyph`, no art assets; empty categories show the
-    glyph dimmed. Click a tab, `PageUp`/`PageDown`, wheel over the bar, Shift+wheel anywhere, per-tab
-    selection/scroll memory, `[GAME] invTabs=1`,
-  - "Take all" button in chest/ransack (header row, right-aligned to the other grid),
-  - layout offsets (padding, grid top, header row) now scale with `Gothic::interfaceScale`; at 225% DPI the header
-    used to overlap the top slot row, and the tab bar needs that band.
-- Icon history: the first attempt used the *item model of the first item in the category* as the tab icon. It
-  looked inconsistent (icons changed with the inventory content, empty categories were dark holes), so the user
-  approved a Pillow mockup of fixed glyphs and the glyphs replaced it the same day. A future upgrade to
-  hand-made/AI-generated art is noted in the plan backlog (needs an asset pipeline and a license decision).
-- Verified by the agent (screenshots + synthetic input, see below):
-  - hover selects the slot and updates the info box,
-  - a click on the hovered slot acts: apple stack went 20 -> 19,
-  - `PageDown` and a click on the "Food" tab both filter the grid to one stack,
-  - right click closes the inventory,
-  - build clean, benchmark smoke test passes (76.5 fps, 13 unique warnings, same set as before).
-- **Not verified by the agent:** "Take all" in game (needs a chest or a body; no console command opens one),
-  wheel scrolling with more items than fit (the grid has ~8 rows here, which needs >40 distinct items), Shift+wheel,
-  fullscreen, and everything in chest/trade/ransack.
+- Branch `feat/inventory-ui`, HEAD `8e9a208c`, pushed to `origin`, **not merged into `master`**.
+- Deployed to `D:\GothicDev\OpenGothic-play` at `8e9a208c` (`BUILD.txt` there), built 2026-10-23.
+- Working tree clean. Build current (`scripts/build-windows.ps1 -Target Gothic2Notr`); benchmark smoke test passes:
+  ~76 fps, 13 unique warnings (same set as before this work).
+- **Iteration A is done and committed. B (drag & drop) and C (tabs in chest/trade, finer categories, polish) are not
+  started.** The checklist lives in the plan.
 
-## Next step
+## Code map (what the fork added)
 
-1. User tests in the play folder (deployed from this branch): hover, click, tabs (click, `PageDown`, wheel over the
-   bar), take all from a chest, trade, ransack, fullscreen. Fix what comes up.
-2. Merge `feat/inventory-ui` into `master` once the user test is fine.
-3. Iteration B: drag & drop (press arms, release acts, movement past ~8 px drags, hold still repeats), double click
-   takes the stack, ghost item at the cursor, target grid highlighted. See the plan for the details.
+| File | What it does now |
+| ---- | ---------------- |
+| `common/ui/inventorymenu.{h,cpp}` | The widget. Mouse mode (`isMouseMode`), hit test recorded while drawing (`GridArea`, `selectAt`), tab bar drawing/state (`drawTabs`, `switchTab`, `cycleTab`, `tabAt`), take-all (`drawTakeAll`, `takeAllItems`), scaled layout (`padd()`, `gridTop()`), cursor hint (`updateCursor`). |
+| `common/ui/inventorytabs.{h,cpp}` | Category list (All, Weapons, Armor, Potions, Food, Writings, Magic, Other), `matches()`, the `std::function<bool(const Item&)>` filter, and `paintGlyph()` (procedural icons, no assets). |
+| `common/game/inventory.{h,cpp}` | `Inventory::ItemFilter` + optional filter on `Inventory::iterator(t, filter)`. Small upstream edit; the rest is untouched. |
+| `common/gothic.cpp` | Defaults `[GAME] invMouse=1`, `[GAME] invTabs=1`. With both 0 the inventory behaves like upstream. |
+
+Pages in `inventorymenu.cpp` (`InvPage`, `TradePage`, `RansackPage`) capture `tabs.filter()` (stable address, so
+switching tabs re-filters without recreating pages). Only the player side is filtered so far.
+
+## Verified / not verified
+
+Verified by the agent with screenshots + synthetic input:
+
+- hover selects the slot and updates the info box; click acts (apple stack 20 -> 19); the old code made a click on
+  the hovered slot a no-op;
+- tabs filter the grid; `PageDown` and clicking a tab both work; active tab = bordered slot, empty tab = dimmed
+  glyph; the bar is exactly grid-wide; every tab has the same `INV_BACK` + `INV_SLOT` background;
+- right click closes; build + benchmark clean.
+
+**Not verified by the agent** (needs the user or a container): take-all in a chest / on a body (no console command
+opens one), wheel scrolling with more items than fit, Shift+wheel, fullscreen, chest/trade/ransack interactions,
+and `interfaceScale` / `inventoryCellSize` variations.
+
+## Next step: iteration B, drag & drop
+
+Interaction state machine (design decision 7 in the plan):
+
+1. `mouseDown` on a slot only **arms** the interaction (remember side + `clsId`; never keep an `Item*` across a
+   move). Release without movement = click: use/equip/take/sell one, keep the "hold still repeats" timer (~350 ms).
+2. Movement past ~8 px while held = drag; the repeat timer must not run.
+3. Drop on the other grid: player -> chest/body = move stack, chest/body -> player = take stack, trade:
+   player -> trader grid = sell, trader -> player = buy. Drop anywhere else = cancel.
+4. Ghost of the dragged item at the cursor (`InventoryRenderer::drawItem`, the info box already does this), target
+   grid highlighted; right click or `Esc` during a drag cancels instead of closing.
+5. Double click (`mouseDoubleClickEvent`) = take/use the whole stack.
+6. Re-resolve the dragged item by `clsId` from the source inventory when needed; the inventory can change under the
+   drag.
+
+All of it fits in `common/ui/inventorymenu.{h,cpp}`; a `DragState` struct next to `GridArea` is enough. Verify with
+the screenshot harness (move with the button held, release over the other grid), then let the user test.
+
+## Open questions for the user (defaults in parentheses)
+
+- Drag moves the whole stack (yes); double click takes the stack (yes).
+- Right click keeps closing the inventory (yes); only during a drag it cancels.
+- Chest/trade tab sync and a shared tab come in C (yes).
+- Merge `feat/inventory-ui` into `master` after the user's test of A (pending).
 
 ## Test harness (works, use it)
 
-Synthetic input reaches the game, even though computer-use cannot move the mouse into it. Recipe that worked on
-2026-10-23:
+The computer-use tool cannot move the mouse into the game, but synthetic input works:
 
-1. Start the game with `scripts/smoke-test.ps1 -Mode idle -Seconds N -RunDir build\smoke-x -Marvin "goto waypoint
-   NW_CITY_HABOUR_05;give ItFo_Apple 20;..." -ScreenshotAt "17,23,31"`.
-2. In a second background job, sleep ~18 s (at 12 s the world may still be loading and the inventory key is
-   ignored), find the window (`Get-Process Gothic2Notr` -> `MainWindowHandle`) and **activate it first**:
-   `AttachThreadInput(GetCurrentThreadId(), GetWindowThreadProcessId(GetForegroundWindow()), true)` +
-   `ShowWindow(hwnd,SW_RESTORE)` + `BringWindowToTop` + `SetForegroundWindow` + `SetActiveWindow`, or simply click
-   somewhere in the window with `mouse_event`. Tempest clears its widget focus when the window goes inactive, and
-   then it ignores keys from every source, including `PostMessage` - that is why some runs silently lost the Tab.
-3. Send keys with `PostMessage` (`WM_KEYDOWN`/`WM_KEYUP` = 0x0100/0x0101, lParam `1 | (scancode<<16)`, scancode
-   from `MapVirtualKey`) or `keybd_event`; both work once the window is active. Use `SetCursorPos` (client
-   coordinates -> `ClientToScreen`) for hover and `mouse_event(2/4)` for clicks, `MOUSEEVENTF_WHEEL` for the wheel.
-   Read the result from the `shot_Ns.png` files.
-4. Keep timings >= 3 s apart so a screenshot falls between two inputs.
+1. `powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -Mode idle -Seconds 34 -RunDir build\smoke-x
+   -Marvin "goto waypoint NW_CITY_HABOUR_05;give ItFo_Apple 20;give ItPo_Health_01 5;give ItMw_1h_Bau_Mace;give
+   ItRw_Arrow 50" -ScreenshotAt "24"`
+2. In a second background job, sleep ~18 s (12 s is sometimes too early: the world may still be loading and the
+   inventory key is ignored), find `Get-Process Gothic2Notr` -> `MainWindowHandle`, then **activate the window
+   first**: `AttachThreadInput(GetCurrentThreadId(), GetWindowThreadProcessId(GetForegroundWindow()), true)` +
+   `ShowWindow(hwnd, SW_RESTORE)` + `BringWindowToTop` + `SetForegroundWindow` + `SetActiveWindow`, or click into
+   the window with `mouse_event`. Keys are ignored while the window is inactive (Tempest clears widget focus),
+   from `keybd_event` and `PostMessage` alike.
+3. Keys: `PostMessage(WM_KEYDOWN/UP = 0x0100/0x0101, lParam = 1 | (scancode<<16))` or `keybd_event`. Mouse:
+   `SetCursorPos` (client -> `ClientToScreen`) for hover, `mouse_event(2/4)` for clicks, `MOUSEEVENTF_WHEEL` for the
+   wheel. Tab (VK 0x09) opens the inventory, `PageDown` (VK 0x22) cycles tabs.
+4. Read the result from `shot_Ns.png` in the run directory. Keep inputs >= 3 s apart.
 
-Layout on the user's machine: 4K window, `Gothic::interfaceScale` = 2.25 -> cell 157, padding 96, grid top 301,
-player grid at x = 2959, width 785, tab bar at y = 237, height 60. General formulas are in the plan
-("Testability and verification"). For exact tab rects, temporarily add `Log::e` lines in `drawAll` and remove them
-again (done once; the code is clean now).
+Layout on the user's machine (4K, `Gothic::interfaceScale` = 2.25): cell 157, padding 96, grid top 301, player grid
+at x = 2959, width 785, tab bar y = 237, height 60 (8 tabs, gap 6). General formulas in the plan. For exact rects,
+temporarily log them with `Log::e` in `drawAll` (flushes; `log.txt` is locked while the game runs).
+
+## Gotchas learned the hard way
+
+- **Cursor shape:** only the hovered widget's shape reaches the OS cursor (`EventDispatcher::implSetMouseOver`);
+  `SystemApi::showCursor` and `Window::hwnd` are not reachable from a widget. The arrow shows up on the first mouse
+  move after opening; do not fight the engine over it.
+- **Painter culls back-facing triangles.** Emit glyph polygons with a consistent winding, or use the normalised
+  `fillFan` in `inventorytabs.cpp`. This is how the right page of the book glyph silently disappeared.
+- **`INV_SLOT` is translucent in the middle.** Anything drawn with only `INV_SLOT` shows the world through it; draw
+  `INV_BACK` behind it first (what the grid does per cell).
+- **Layout offsets** (`43` padding, `134` grid top, `70` header row) used to be raw pixels while cells and fonts
+  scale with `interfaceScale`; they are scaled now. At 225% the inventory shows 8 rows; `invMaxColumns` /
+  `inventoryCellSize` in `Gothic.ini` change the grid.
+- **`drawAll` has a local `padd`** that shadows the `padd()` method; use `this->padd()` there.
+- **Save format:** do not bump `Serialize::Version::Current`. Fork-only state goes into a new optional entry.
+- **No assets:** the repo ships none. A generated/hand-made icon set (the user floated a local Gemini/OpenAI tool)
+  needs an asset pipeline (embed at build, or a `ui/` folder copied by `deploy-play.ps1`) and a license decision;
+  see the plan backlog.
+- Keep edits in upstream files small and localized; new logic goes into new files.
+
+## First 15 minutes for the next agent
+
+1. `git log --oneline -6`, `git status`; confirm HEAD `8e9a208c` on `feat/inventory-ui` and a clean tree.
+2. Build + benchmark: `scripts/build-windows.ps1 -Target Gothic2Notr`, `scripts/smoke-test.ps1` (~76 fps, 13
+   warnings).
+3. Read `docs/fork/plan-inventory.md` (iterations A/B/C and the design decisions).
+4. Ask the user: did the tab-bar fixes (background, book glyph) look right, and does take-all work in a chest? Fix
+   that first if not.
+5. Then start iteration B at `InventoryMenu::mouseDownEvent` / `mouseUpEvent` / `mouseDragEvent` per the state
+   machine above.
 
 ## Session log
 
 ### 2026-10-23: icon tabs
 
-- User feedback on the first play test: the text tab bar was ~1.6x wider than the grid (8 labels vs 5 columns, the
-  same ratio at any resolution), so it floated over the world.
-- Options discussed: icon tabs (what the Union plugin does, and the only thing that scales to 15-20 categories
-  later), a vertical text rail (roomy, bigger change, also solves the shared tab for chest/trade), or clipping and
-  scrolling the bar.
-- Mocked both in Pillow (`build/mock_tabs.py`, throwaway) and the user picked fixed **glyphs** over item-model
-  icons. Implemented in `InventoryTabs::paintGlyph` with `drawRect` + triangle fans (`p.drawTriangle` with a color
-  brush); no textures, no asset pipeline.
+- User feedback on the first play test: the text tab bar was ~1.6x wider than the grid (8 labels vs 5 columns, same
+  ratio at any resolution), so it floated over the world.
+- Options discussed: icon tabs (what the Union plugin does, the only thing that scales to 15-20 categories later),
+  a vertical text rail (roomy, bigger change, also solves the shared tab for chest/trade), or a clipped/scrolling
+  bar. Mocked icon bar and rail in Pillow (`build/mock_tabs.py`, throwaway); the user picked fixed **glyphs**.
+- Implemented `InventoryTabs::paintGlyph` with `drawRect` + triangle fans (`p.drawTriangle` with a color brush); no
+  textures, no asset pipeline.
 - Two follow-up fixes from the user's second look:
   - **Transparency:** `INV_SLOT` is translucent in the middle; tabs that only had `INV_SLOT` let the world show
-    through, while the empty tabs (which used `INV_BACK`) showed its fine grid pattern. Now `INV_BACK` is drawn
-    once behind the whole bar and every tab draws `INV_SLOT` on top, exactly like a grid cell.
+    through, while the empty tabs (only `INV_BACK`) showed its fine grid pattern. Now `INV_BACK` is drawn once
+    behind the whole bar and every tab draws `INV_SLOT` on top, like a grid cell.
   - **Winding:** the painter culls back-facing triangles, and the right page of the book was authored clockwise, so
     it vanished. `fillFan` now normalises the winding from the polygon's signed area.
-- Harness gotcha found here: `keybd_event` needs the game to be the foreground window and silently loses the key
-  otherwise (one run opened nothing); `PostMessage(WM_KEYDOWN/UP)` works regardless of focus and is now the
-  documented way to send keys. Tempest clears the widget focus when the window goes inactive, so activate the
-  window first (`AttachThreadInput` + `ShowWindow(SW_RESTORE)` + `SetForegroundWindow`, or a click in the window);
-  otherwise even `PostMessage` input is ignored.
+- Harness: `keybd_event` and `PostMessage` both need an active window (see the harness section); sleeping 12 s is
+  sometimes too early.
 
 ### 2026-10-23: iteration A
 
-- Found and fixed the click-after-hover bug. The old code only acted when `selectAt` changed the selection, and
-  hover had already set it; a synthetic click on the hovered apple slot did nothing, after the fix it eats one.
-- Implemented `common/ui/inventorytabs.{h,cpp}` (tab list, predicates, active tab) and an optional
-  `Inventory::ItemFilter` on `Inventory::iterator()` (`game/inventory.*`, small upstream edit) so `Page::size/get`,
-  `drawItems` and the info box keep working unchanged. Pages capture the filter pointer; its address is stable,
-  so switching tabs re-filters without recreating the pages. The other side (chest/trader) has no filter yet.
-- Tab bar is drawn in the `Back` pass into the band between the header row and the grid, right-aligned to the player
-  grid and clamped to the left padding; widths come from the font, so 8 tabs fit at 4K/225%.
-- Take-all collects `(clsId, count)` first and then moves them (`player->addItem(cls, *chest/trader, count)`),
-  because moving items invalidates the iterator.
-- Scaled `padd`/`gridTop`/header row with `Gothic::interfaceScale`. Verified visually: the header no longer
-  overlaps the top row and the tab bar has room.
-- Cursor: Tempest applies only the hovered widget's shape, and `SystemApi::showCursor`/`Window::hwnd` are not
-  reachable from a widget. The inventory sets its shape on open/close; the arrow appears on the first mouse move.
-  Good enough, do not fight the engine over it.
-- Gotcha: `drawAll` has a local `padd` variable that shadows the new `padd()` method (a temporary log call failed
-  on `padd()`); if you add code there, use `this->padd()` or rename the local.
+- Fixed the click-after-hover bug: the old `selectAt` reported "selection changed", and hover had already set it, so
+  a click on the hovered slot did nothing. It now reports "there is an item under the cursor".
+- Implemented `common/ui/inventorytabs.{h,cpp}` and an optional `Inventory::ItemFilter` on `Inventory::iterator()`.
+  Pages capture the filter pointer; its address is stable, so switching tabs re-filters without recreating pages.
+- Tab bar is drawn in the `Back` pass in the band between the header row and the grid (grid-wide, 8 tabs).
+- Take-all collects `(clsId, count)` first and then moves them, because moving items invalidates the iterator.
+- Scaled `padd`/`gridTop`/header row with `Gothic::interfaceScale` (the header used to overlap the top row at 225%).
+- Cursor: the inventory sets its shape on open/close; Tempest only applies the hovered widget's shape.
 
 ### 2026-10-12: phase 1
 
 - Mouse control in `InventoryMenu` (hover, click, wheel, cursor), `[GAME] invMouse`, `give` console command.
-- Gotcha: computer-use cannot send mouse moves to the game (see above); clicks work.
+- Gotcha: computer-use cannot send mouse moves to the game; clicks work.
 
 ### 2026-10-12: plan
 
 - Looked at `common/ui/inventorymenu.cpp`, `MainWindow` mouse handling and `Inventory` sorting; wrote the plan.
-- Reference plugin: Union Advanced Inventory; the user's settings for it are in `[ADV_INVENTORY]` in
+- Reference plugin: Union Advanced Inventory; the user's settings are in `[ADV_INVENTORY]` in
   `D:\GothicDev\Gothic II OpenGothic\system\Gothic.ini`.
