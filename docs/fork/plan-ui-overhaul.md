@@ -26,19 +26,20 @@ fields, item icons for tabs, a re-layout of the scripted main menu geometry.
    New behaviour sits behind `[GAME]` flags with defaults in `common/gothic.cpp`, so a player can go back
    to vanilla behaviour without a rebuild:
    `invMouse` (exists), `invTabs` (exists), `invTooltip`, `invScrim`, `dlgMouse`, `menuMouse`,
-   `docMouse`, `hudModern`.
+   `docMouse`.
 2. **One drawing kit** (`common/ui/uidraw.{h,cpp}`) for panels, scrims, hover states, tooltips, scroll
-   bars and shadowed text. New file, so upstream edits stay small. Everything is immediate-mode: the
+   bars and text helpers. New file, so upstream edits stay small. Everything is immediate-mode: the
    widgets already paint themselves every frame and hit-test what they drew.
 3. **Hit test what was drawn.** Same rule as iteration A of the inventory: each window records
    `{rect, id}` while painting and the mouse handlers look it up. No second copy of the layout math.
-   Shared helper `UiHitList` in the kit.
+   Shared helper `UiDraw::HitList` in the kit; the scripted menus store the rect on their `Item`
+   because the slider and choice-box handlers need the geometry too.
 4. **Fullscreen is not an afterthought.** In fullscreen the engine warps the cursor to the window center
-   on every mouse move (camera look). While a mouse-driven window is open the warp must stop, otherwise
-   the pointer jumps away and the UI is unusable. `MainWindow::processMouse` gets a single gate rather
-   than each widget fighting for the cursor.
+   on every mouse move (camera look). While a mouse-driven window is open the warp stops, otherwise the
+   pointer jumps away and the UI is unusable: `MainWindow::uiOwnsMouse()`.
 5. **Accent colour instead of new art.** Selected/hover/active states use one accent (warm gold), drawn
-   as a 2 px border and a low-alpha fill. Vanilla textures stay underneath for the Gothic material look.
+   as a 2 px border/bar and a low-alpha fill. Vanilla textures stay underneath for the Gothic material
+   look.
 6. **Drag & drop re-resolves items by class id** (`clsId`) whenever it needs the item; the inventory can
    change under a drag. Never keep an `Item*` across a move.
 7. **No savegame changes in v1.** All options are ini only.
@@ -47,49 +48,56 @@ fields, item icons for tabs, a re-layout of the scripted main menu geometry.
 
 ### 1. Inventory (the centerpiece)
 
-- [ ] Dim backdrop behind the window (`invScrim`).
-- [ ] Frames: player panel (header + tabs + grid + hint line) and the container/trader panel (header
-      with name + take-all button, grid). Panels use `INV_BACK` + a dark fill so the world no longer
-      shows through the slot grid.
-- [ ] Header: title left (player name / chest / trader), gold right on the player side.
-- [ ] Hover: slot ring, item name tooltip at the cursor (`invTooltip`) with the stat rows that the info
-      box shows; the info box stays for keyboard-only play.
-- [ ] Tabs: 10 categories (melee, ranged, armor, potions, food, magic, writings, trophies, keys, other)
-      matched from `mainFlag`/`itemFlag` with an instance-name fallback; one active tab filters **both**
-      sides; tab tooltip with the label; empty tabs dimmed; accent on the active tab.
-- [ ] Drag & drop: press arms, move past ~8 px drags, release on the other grid moves the stack
+- [x] Dim backdrop behind the window (`invScrim`).
+- [x] Frames: player panel (header with title + gold, grid) and the container/trader panel (header with
+      name, take-all button or item count), both with a dark fill so the world no longer shows through
+      the slot grid. A tool-strip style tab bar sits above them.
+- [x] Hover: the selected slot follows the cursor, item tooltip at the cursor (`invTooltip`) with the
+      stat rows and the sell price in trade; the info box stays for keyboard-only play.
+- [x] Tabs: 11 categories (melee, ranged, armor, potions, food, magic, writings, trophies, keys, other)
+      matched from `mainFlag` with an instance-name fallback for `ItAt_`/`ItKe_`; one active tab filters
+      **both** sides; tab tooltip with the label; empty tabs dimmed; accent underline on the active tab.
+- [x] Drag & drop: press arms, movement past ~8 px drags, release on the other grid moves the stack
       (chest: take/put, trade: buy/sell, ransack: take), release elsewhere cancels, right click / `Esc`
-      cancels a drag instead of closing, double click takes the stack.
-- [ ] Hover-and-hold repeat still works for taking one item at a time.
-- [ ] Scroll indicator when a grid has more rows than fit; wheel scrolls the grid under the cursor.
-- [ ] Hint line under the player grid: drag / double click / right click, dim font.
-- [ ] Take-all key (`Shift+A`) in addition to the button.
-- [ ] Sounds: `INV_CHANGE` when switching tabs, `INV_OPEN`/`INV_CLOSE` as today.
+      cancels a drag instead of closing.
+- [x] Hold-to-repeat still works for taking one item at a time; a small movement restarts its delay so
+      starting a drag never takes an item by accident.
+- [x] Hint line at the bottom of the screen: drag / double click / right click, dim font.
+- [x] Take-all key (`Shift+A`) in addition to the button.
+- [x] Sounds: `INV_CHANGE` when switching tabs and when a drag moves a stack, `INV_OPEN`/`INV_CLOSE` as
+      before.
+- [ ] Scroll indicator when a grid has more rows than fit (`UiDraw::scrollBar` exists, not wired up:
+      the wheel works, the indicator does not).
 
 ### 2. Dialogs, documents, scripted menus
 
-- [ ] Dialog choices: hover highlights and selects the row under the cursor, click picks it, wheel
-      scrolls; the choice panel gets the same frame treatment (`dlgMouse`).
-- [ ] Documents (books/letters/notes): dim backdrop, click closes (`docMouse`), so a note can be
-      dismissed with either mouse button.
-- [ ] Scripted menus (`MENU_MAIN`, options, save/load, status): hover selects, click executes, wheel
-      moves the selection, sliders can be dragged to a value (`menuMouse`). The item hit-test rects are
-      recorded while painting.
-- [ ] MainWindow: stop warping the cursor while a mouse-driven window is open; show the arrow cursor.
+- [x] Dialog choices: hover selects and highlights the row under the cursor, click takes it; stable
+      panel height measured with the drawing font, dark plate under the character texture.
+- [x] Documents (books/letters/notes): dim backdrop, click closes (`docMouse`), hint line.
+- [x] Scripted menus (`MENU_MAIN`, options, save/load, status): hover selects (with the browse sound),
+      click activates, sliders drag, choice boxes step by clicking their sides (`menuMouse`), gold
+      marker on the selected item.
+- [x] MainWindow: stop warping the cursor while a mouse-driven window is open; arrow cursor in menus.
 
 ### 3. HUD and polish
 
-- [ ] Health/mana bars: soft shadow under the frame, smoothed value decay, optional numeric values
-      (`hudModern`).
-- [ ] Focus label: a subtle plate behind the focused object's name so it stays readable against bright
-      backgrounds.
-- [ ] Shared hover/selection feedback in all windows.
+- [x] Soft plate behind the health/mana bars and behind the focus name.
+- [ ] Numeric health/mana values and a damage trail on the bars.
+- [ ] Item icons for the tabs (needs an asset pipeline and a licence decision).
+
+## Open questions for the user
+
+- Does the drag need to move only one item (modifier key) in addition to the whole stack? (v1 moves the
+  whole stack, double click moves the stack too.)
+- Should the tab strip also appear above the container/trader grid, or is one shared strip above the
+  panels fine? (v1: one shared strip, capped width and centred.)
+- Is the hint line at the bottom wanted permanently, or should it fade after the first few seconds?
 
 ## Verification
 
 No unit tests. Per phase: build (`scripts/build-windows.ps1 -Target Gothic2Notr`), benchmark smoke test
-(`scripts/smoke-test.ps1`), then `idle` runs with synthetic input and screenshots (see
-`docs/fork/handoff-inventory.md` for the recipe). Every phase ends with the user-facing deploy
-(`scripts/deploy-play.ps1`) only at the end of the session, so intermediate builds stay in `build/`.
+(`scripts/smoke-test.ps1`), then `build/ui-run.ps1` (fork-local harness) with synthetic input and
+screenshots. Recipe and gotchas in `docs/fork/handoff-ui.md`.
 
 Keyboard regression is the main risk: every mouse handler must let the keyboard path through untouched.
+Run the inventory with `-Ini "[GAME]`r`ninvMouse=0`r`ninvTabs=0"` after touching it.
