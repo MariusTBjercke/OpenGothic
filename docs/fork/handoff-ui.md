@@ -222,6 +222,24 @@ Gotchas:
 
 ## Session log
 
+### 2026-10-24 (afternoon, second round): loot window
+
+- User report: switching tabs while looting an NPC "triggered looting like in vanilla". Root cause was
+  not the click routing: `InventoryMenu::tick()` closes the ransack window when the ransack iterator is
+  empty, and the iterator used the **category filter**, so clicking a tab whose category the corpse has
+  no items in made the window vanish mid-click — the rest of the click / the next click then landed in
+  the world and did a vanilla loot click. The "anything left to loot" check is unfiltered again; the
+  filter only decides what the tab shows.
+- Also fixed: in the loot window the bar belongs to the *corpse* grid (ransack only draws that side), so
+  `switchTab` now remembers/restores that side instead of pointing the active page at the invisible
+  player grid.
+- Verified with a dead NPC (temporary F8 hook that killed the nearest NPC and opened the loot window,
+  removed again): the bar sits above the corpse grid, switching to a category the corpse has nothing in
+  keeps the window open, switching back shows the items, and clicking a corpse slot still takes that
+  stack (vanilla). Note that "Take all" in the loot window moves what the active tab shows.
+- Two harness gotchas seen again: clicks near the left/top of the screen can land in the terminal window
+  that sits in front (the game must be foreground), and the input clock is ~3 s behind the screenshots.
+
 ### 2026-10-24 (afternoon): tab bar polish and the double-click trap
 
 - User report 1: item models floated over the tooltip text. The item models are drawn *between* the UI
