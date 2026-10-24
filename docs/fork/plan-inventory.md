@@ -111,32 +111,35 @@ All of it is OpenGothic C++, not Daedalus script (in the original it is hardcode
 - [x] Equipped/number-slot overlays and the info box keep working in filtered views (they follow the filtered
       iterator; an equipped item outside the active tab shows no overlay, which is expected).
 - [ ] Test in game by the user: fullscreen and `-window`, chest, trade, ransack, take all, wheel, different
-      `interfaceScale` / `inventoryCellSize`.
+      `interfaceScale` / `inventoryCellSize`. Trade layout and drag were verified by the agent in the UI-overhaul
+      session (`docs/fork/handoff-ui.md`); chest/ransack still need a real container.
 
 ### B: drag & drop and direct manipulation
 
-- [ ] Interaction state machine: press arms, release without movement acts, movement past the threshold drags,
+> Done in the UI overhaul (`docs/fork/plan-ui-overhaul.md`, handoff `docs/fork/handoff-ui.md`); the
+> checkboxes below are kept for the original wording.
+
+- [x] Interaction state machine: press arms, release without movement acts, movement past the threshold drags,
       holding still repeats (decision 7).
-- [ ] Drag within the player inventory does nothing for now (order is sorted, not manual).
-- [ ] Drag player -> chest: move the stack; chest -> player: take the stack; trade: player item onto the trader
+- [x] Drag within the player inventory does nothing for now (order is sorted, not manual).
+- [x] Drag player -> chest: move the stack; chest -> player: take the stack; trade: player item onto the trader
       grid sells, trader item onto the player grid buys; ransack: body -> player takes.
-- [ ] Ghost of the dragged item at the cursor (`InventoryRenderer::drawItem`), target grid highlighted, drop on
+- [x] Ghost of the dragged item at the cursor (`InventoryRenderer::drawItem`), target grid highlighted, drop on
       an invalid target cancels.
-- [ ] Double click takes/uses the stack (`mouseDoubleClickEvent` already exists in Tempest).
-- [ ] Do not let a drag trigger the take-repeat timer, and do not act twice (on press and on release).
-- [ ] Cancellation: right click or `Esc` during a drag cancels instead of closing; closing a container mid-drag
+- [x] Double click takes/uses the stack (`mouseDoubleClickEvent` already exists in Tempest).
+- [x] Do not let a drag trigger the take-repeat timer, and do not act twice (on press and on release).
+- [x] Cancellation: right click or `Esc` during a drag cancels instead of closing; closing a container mid-drag
       must not crash (item lookup by `clsId`, never a raw `Item*` kept across a move).
 
 ### C: tabs everywhere and polish
 
-- [ ] Tab bar for the other side (chest/trader); one shared active tab for both sides
-      (`bNeedSyncPlayerAndTradeCategories`); trade info box still shows the sell price for player items.
-- [ ] Finer categories: 1H/2H (flags `DAG|SWD|AXE` vs `2HD_*`), bows/crossbows, keys/maps/trophies/boxes/jewelry/
-      quest items via flags and instance-name prefixes.
-- [ ] Tooltip at the cursor instead of (or in addition to) the bottom info box; item name and count.
+- [x] One shared active tab for both sides (the filter applies to the player and the chest/trader grid); the
+      trade tooltip shows the sell price for player items.
+- [x] Finer categories: melee/ranged, keys and trophies via instance-name prefixes (`ItKe_`, `ItAt_`), eleven
+      tabs in total. Bows/crossbows and jewelry stay in their coarse tabs for now.
+- [x] Tooltip at the cursor with the item name, count and stat rows; the info box stays for keyboard play.
 - [ ] Scroll indicators when the grid has more rows than fit; empty-state text per tab.
-- [ ] Click sounds (`INV_CHANGE` / `INV_OPEN` style) and a subtle hover highlight distinct from the keyboard
-      selection.
+- [x] Click sounds (`INV_CHANGE` on tab switch and on a drag move).
 
 ### Backlog (not planned yet)
 
