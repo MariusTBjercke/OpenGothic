@@ -11,6 +11,7 @@
 #include "gothic.h"
 #include "inventorymenu.h"
 #include "resources.h"
+#include "ui/uidraw.h"
 
 using namespace Tempest;
 
@@ -350,6 +351,8 @@ void DialogMenu::close() {
   choice.clear();
   state=State::Idle;
   currentSnd = SoundEffect();
+  choiceHover = -1;
+  choiceAreasCount = 0;
   update();
 
   if(prevPl!=nullptr && prevPl==prevNpc){
@@ -468,6 +471,7 @@ void DialogMenu::paintEvent(Tempest::PaintEvent &e) {
   }
 
 void DialogMenu::paintChoice(PaintEvent &e) {
+  choiceAreasCount = 0;
   if(choice.size()==0)
     return;
 
@@ -476,14 +480,21 @@ void DialogMenu::paintChoice(PaintEvent &e) {
   const int   dw       = std::min(w(),int(600*scale));
   const bool  isActive = isChoiceMenuActive();
 
+  // row rects are computed first: they are needed both for drawing and for the mouse hit test.
+  // Use the font the row will actually be drawn with (the selected row uses the highlight font),
+  // otherwise the panel is one row-height too short and the last row gets clipped.
+  std::vector<Rect> rows;
   int  dh = padd*2;
+  auto fntHi = Resources::font(Resources::FontType::Hi, scale);
   for(size_t i=0;i<choice.size();++i){
-    auto fnt = Resources::dialogFont(scale);
-    Size choiceTextSize = fnt.textSize(dw-padd, choice[i].title);
+    // measure every row with the highlight font: the selected row is drawn with it, and a stable
+    // row height keeps the panel from jumping while the mouse moves over the choices
+    Size choiceTextSize = fntHi.textSize(dw-padd, choice[i].title);
+    rows.emplace_back(Rect((w()-dw)/2+padd/2, 0, dw-padd, choiceTextSize.h));
     dh += choiceTextSize.h;
     }
 
-  const int  y        = h()-dh-int(20*scale);
+  const int  y = std::max(0,h()-dh-int(20*scale));
 
   if(tex!=nullptr && (choiceAnimTime>0 || isActive)) {
     float k    = dlgAnimation ? (float(choiceAnimTime)/float(ANIM_TIME)) : 1.f;
@@ -491,9 +502,8 @@ void DialogMenu::paintChoice(PaintEvent &e) {
     int   dlgH = int(float(dh)*k);
 
     Painter p(e);
-    p.setBrush(*tex);
-    p.drawRect((w()-dlgW)/2,y+(dh-dlgH)/2,dlgW,dlgH,
-               0,0,tex->w(),tex->h());
+    // fork: a dark plate under the choice texture keeps the text readable over a bright scene
+    UiDraw::panel(p,Rect((w()-dlgW)/2,y+(dh-dlgH)/2,dlgW,dlgH),tex,0.55f,false);
     }
 
   if(choiceAnimTime<ANIM_TIME && dlgAnimation)
@@ -502,7 +512,7 @@ void DialogMenu::paintChoice(PaintEvent &e) {
   if(!isChoiceMenuActive())
     return;
 
-  int textHeightOffset = padd;
+  int baseline = y + padd + padd;
   Painter p(e);
   for(size_t i=0;i<choice.size();++i){
     GthFont fnt;
@@ -510,10 +520,53 @@ void DialogMenu::paintChoice(PaintEvent &e) {
       fnt = Resources::font(Resources::FontType::Hi, scale); else
       fnt = Resources::dialogFont(scale);
 
-    int x = (w()-dw)/2;
-    Size choiceTextSize = fnt.textSize(dw-padd, choice[i].title);
-    fnt.drawText(p,x+padd,y+padd+textHeightOffset,dw-padd,0,choice[i].title,AlignLeft);
-    textHeightOffset += choiceTextSize.h;
+    const int   rh  = rows[i].h;
+    const Rect  row(rows[i].x, baseline-rh, rows[i].w, rh);
+    const bool  hov = int32_t(i)==choiceHover;
+    if(hov || i==dlgSel) {
+      // fork: the row under the cursor gets the same band as the keyboard selection
+      const int bar = std::max(2,int(3*scale));
+      UiDraw::fill(p,row,UiDraw::Theme::accentSoft(hov ? 0.18f : 0.10f));
+      UiDraw::fill(p,Rect(row.x,row.y,bar,row.h),UiDraw::Theme::accentSoft(hov ? 0.95f : 0.65f));
+      }
+
+    fnt.drawText(p,row.x,baseline,row.w,0,choice[i].title,AlignLeft);
+    if(choiceAreasCount<std::size(choiceAreas))
+      choiceAreas[choiceAreasCount++] = ChoiceArea{row,uint32_t(i)};
+    baseline += rh;
+    }
+  }
+
+bool DialogMenu::isMouseMode() const {
+  return Gothic::settingsGetI("GAME","dlgMouse")!=0;
+  }
+
+int32_t DialogMenu::choiceAt(const Tempest::Point& p) const {
+  for(size_t i=0;i<choiceAreasCount;++i)
+    if(choiceAreas[i].rect.contains(p))
+      return int32_t(choiceAreas[i].id);
+  return -1;
+  }
+
+void DialogMenu::mouseMoveEvent(MouseEvent& event) {
+  if(state==State::Idle || trade.isOpen()!=InventoryMenu::State::Closed) {
+    event.ignore();
+    return;
+    }
+  if(!isMouseMode()) {
+    event.ignore();
+    return;
+    }
+
+  // the cursor stays free while the dialog is up, so do not let MainWindow re-center it
+  event.accept();
+
+  const int32_t hit = choiceAt(event.pos());
+  if(hit!=choiceHover) {
+    choiceHover = hit;
+    if(hit>=0 && size_t(hit)<choice.size())
+      dlgSel = size_t(hit);
+    update();
     }
   }
 
@@ -539,6 +592,15 @@ void DialogMenu::mouseDownEvent(MouseEvent &event) {
     }
 
   if(event.button==MouseEvent::ButtonLeft) {
+    if(isMouseMode()) {
+      const int32_t hit = choiceAt(event.pos());
+      if(hit>=0 && size_t(hit)<choice.size()) {
+        dlgSel = size_t(hit);
+        choiceHover = hit;
+        onSelect();
+        return;
+        }
+      }
     onSelect();
     }
   if(event.button==MouseEvent::ButtonRight) {

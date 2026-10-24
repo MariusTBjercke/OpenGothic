@@ -46,6 +46,7 @@ class DialogMenu : public Tempest::Widget {
     void paintChoice(Tempest::PaintEvent& e);
 
     void mouseDownEvent (Tempest::MouseEvent& event) override;
+    void mouseMoveEvent (Tempest::MouseEvent& event) override;
     void mouseWheelEvent(Tempest::MouseEvent& event) override;
 
     void onSelect();
@@ -146,4 +147,16 @@ class DialogMenu : public Tempest::Widget {
     bool                                showSubtitles       = true;
     bool                                showSubtitlesPlayer = true;
     uint64_t                            choiceAnimTime      = 0;
+
+    // fork: mouse support for the choice list, see docs/fork/plan-ui-overhaul.md
+    struct ChoiceArea final {
+      Tempest::Rect rect;
+      uint32_t      id = 0;
+      };
+    ChoiceArea                          choiceAreas[16];
+    size_t                              choiceAreasCount = 0;
+    int32_t                             choiceHover      = -1;
+
+    bool                                isMouseMode() const;
+    int32_t                             choiceAt(const Tempest::Point& p) const;
   };
