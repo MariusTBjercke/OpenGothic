@@ -91,6 +91,7 @@ class MainWindow : public Tempest::Window {
 
     void processMouse(Tempest::MouseEvent& event, bool enable);
     void tickMouse(uint64_t dt);
+    bool uiOwnsMouse() const;   // fork: a mouse-driven window is open, keep the cursor free
     void onSettings();
 
     void setupUi();

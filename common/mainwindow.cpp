@@ -323,6 +323,8 @@ void MainWindow::mouseUpEvent(MouseEvent &event) {
   }
 
 void MainWindow::mouseDragEvent(MouseEvent &event) {
+  if(uiOwnsMouse())
+    return; // the open window handles its own drags; do not warp the cursor under it
   const bool fs = SystemApi::isFullscreen(hwnd());
   if(!mouseP[Event::ButtonLeft] && !fs)
     return;
@@ -332,7 +334,23 @@ void MainWindow::mouseDragEvent(MouseEvent &event) {
   }
 
 void MainWindow::mouseMoveEvent(MouseEvent &event) {
-  processMouse(event,SystemApi::isFullscreen(hwnd()));
+  const bool fs = SystemApi::isFullscreen(hwnd());
+  processMouse(event, fs && !uiOwnsMouse());
+  }
+
+bool MainWindow::uiOwnsMouse() const {
+  // Fork: while a window that drives the cursor itself is open, the engine must not re-center the
+  // cursor (that is what makes mouse menus unusable in fullscreen). Each window has its own switch
+  // so vanilla keyboard behaviour stays available.
+  if(rootMenu.isActive())
+    return Gothic::settingsGetI("GAME","menuMouse")!=0;
+  if(inventory.isActive())
+    return inventory.wantsCursor();
+  if(dialogs.isActive())
+    return Gothic::settingsGetI("GAME","dlgMouse")!=0;
+  if(document.isActive())
+    return Gothic::settingsGetI("GAME","docMouse")!=0;
+  return false;
   }
 
 void MainWindow::processMouse(MouseEvent& event, bool enable) {
@@ -598,6 +616,15 @@ void MainWindow::paintFocus(Painter& p, const Focus& focus, const Matrix4x4& vp)
     iy = tsize.h;
   if(iy>h())
     iy = h();
+
+  // fork: name plate behind the focus label, the plain text disappears over bright walls and snow
+  {
+  const int padX = int(10*scale);
+  const int padY = int(4*scale);
+  p.setBrush(Color(0.f,0.f,0.f,0.38f));
+  p.drawRect(ix-padX, iy-tsize.h-padY, tsize.w+2*padX, tsize.h+2*padY);
+  }
+
   fnt.drawText(p,ix,iy,focus.displayName());
 
   if(focus.npc!=nullptr && !focus.npc->isDead()) {
@@ -692,6 +719,11 @@ void MainWindow::drawBar(Painter &p, const Tempest::Texture2d* bar, int x, int y
     x-=int(destW)/2;
   if(flg & AlignBottom)
     y-=int(destH);
+
+  // fork: a soft plate under the frame so the bar stays readable on bright ground (the stock
+  // texture alone disappears over snow/sand)
+  p.setBrush(Color(0.f,0.f,0.f,0.30f));
+  p.drawRect(x-int(4*scale),y-int(3*scale),int(destW)+int(8*scale),int(destH)+int(6*scale));
 
   p.setBrush(*barBack);
   p.drawRect(x,y,int(destW),int(destH), 0,0,barBack->w(),barBack->h());
