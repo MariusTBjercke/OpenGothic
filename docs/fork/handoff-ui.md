@@ -180,10 +180,17 @@ Gotchas:
 - `InventoryMenu::drawHints` draws the screen-level hint line; there is no per-panel footer any more
   (it clipped the text on 4K). The trader header shows `N items` when there is no "Take all" button.
 - The tab strip is flush on top of the panels and exactly as wide as the content (one panel in equip
-  mode, both in a trade window): `drawAll` places it at `iy-hdrH-pp-tabH`, `drawTabs` insets the cells by
-  the panel padding and spreads the integer-division remainder over the first tabs so there is no gap at
-  the right end. In a trade window the cell band is capped at `68*scale` per tab and centred inside the
-  strip, so the tabs do not stretch over both panels.
+  mode, both in a trade window). Its cells are **contiguous** and fill the bar exactly: the leftover
+  pixels of the integer division go to the first cells, so there is no gap at the right end and no dead
+  pixel between two tabs. `InventoryMenu::tabAt` is a *geometric* lookup over `tabBar` (`band`, `cellW`,
+  `extra`, `strip`) instead of per-cell hit rects — a click anywhere in the bar (including its padding)
+  maps to a tab. That replaced the old 6 px gaps, which were click-through dead zones and the reason
+  tabs sometimes "did not react".
+- `mouseDownEvent` cancels an armed/active drag before anything else, and `mouseLeaveEvent` cancels a
+  drag: a mouse-up that never reached the window (released outside, alt-tab) used to leave a stale drag
+  that ate the next click on a tab and acted on the old slot.
+- The grid gets an explicit 2 px frame (`UiDraw::Theme::gridLine`) on all four sides; the cell textures
+  have no border on their outer left/top edge, which made the table look clipped against the panel.
 - The item tooltip is drawn in the front overlay pass (see the draw-order gotcha above).
 
 ## Gotchas learned the hard way

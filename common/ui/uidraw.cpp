@@ -57,6 +57,12 @@ Color UiDraw::Theme::textOnPanel() {
   return Color(1.f);
   }
 
+Color UiDraw::Theme::gridLine() {
+  // matches the border colour of the INV_SLOT cell texture, so the outer frame of a grid looks like
+  // part of the cell table instead of a separate widget
+  return Color(0.74f,0.76f,0.80f,0.55f);
+  }
+
 void UiDraw::fill(Painter& p, const Rect& r, const Color& c) {
   if(r.w<=0 || r.h<=0 || c.a()<=0.f)
     return;

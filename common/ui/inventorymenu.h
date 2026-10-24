@@ -84,10 +84,16 @@ class InventoryMenu : public Tempest::Widget {
       size_t                  scroll = 0;
       };
 
-    struct TabArea final {
-      Tempest::Rect           rect;
-      uint8_t                 tab  = 0;
+    // fork: tab bar geometry. The cells are contiguous and derived from the strip rect, so a click
+    // anywhere in the bar maps to a tab (per-cell hit records used to leave dead pixels in the gaps
+    // and could go stale between paints).
+    struct TabBar final {
+      Tempest::Rect           strip;     // whole bar, including its padding
+      Tempest::Rect           band;      // area covered by the tab cells
+      int                     cellW = 0; // width of one cell
+      int                     extra = 0; // first `extra` cells are one pixel wider
       };
+    TabBar                    tabBar;
 
     struct ActionArea final {
       Tempest::Rect           rect;
@@ -130,8 +136,6 @@ class InventoryMenu : public Tempest::Widget {
 
     // fork: category tabs ([GAME] invTabs) and take-all button
     InventoryTabs             tabs;
-    TabArea                   tabAreas[InventoryTabs::Count];
-    size_t                    tabAreasCount = 0;
     int8_t                    tabHover      = -1;
     PageLocal                 tabLocal[InventoryTabs::Count];
     ActionArea                takeAll;

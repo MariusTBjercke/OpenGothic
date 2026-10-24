@@ -37,6 +37,7 @@ struct Theme final {
   static Tempest::Color shadow();
   static Tempest::Color scrim();       // full-window dim behind a modal window
   static Tempest::Color textOnPanel(); // glyph/text tint on top of a panel
+  static Tempest::Color gridLine();    // frame around a table/grid of slots
   };
 
 // ---------------------------------------------------------------- metrics

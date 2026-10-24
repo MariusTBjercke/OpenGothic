@@ -58,6 +58,7 @@ fields, item icons for tabs, a re-layout of the scripted main menu geometry.
 - [x] Tabs: 11 categories (melee, ranged, armor, potions, food, magic, writings, trophies, keys, other)
       matched from `mainFlag` with an instance-name fallback for `ItAt_`/`ItKe_`; one active tab filters
       **both** sides; tab tooltip with the label; empty tabs dimmed; accent underline on the active tab.
+      The cells are contiguous, fill the bar evenly and the whole bar is clickable (geometric hit test).
 - [x] Drag & drop: press arms, movement past ~8 px drags, release on the other grid moves the stack
       (chest: take/put, trade: buy/sell, ransack: take), release elsewhere cancels, right click / `Esc`
       cancels a drag instead of closing.

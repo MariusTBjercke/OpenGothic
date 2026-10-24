@@ -128,7 +128,6 @@ void InventoryMenu::close() {
   renderer.reset(true);
   state  = State::Closed;
   gridsCount = 0;
-  tabAreasCount = 0;
   tabHover = -1;
   takeAll.valid = false;
   takeAllHover  = false;
@@ -444,6 +443,12 @@ void InventoryMenu::mouseDownEvent(MouseEvent &e) {
   mousePos     = e.pos();
   mouseTracked = true;
 
+  // A new press supersedes any half-finished interaction. Without this a mouse-up that never reached
+  // the window (released outside, alt-tab) left a drag armed, and the next click on a tab was eaten
+  // by the stale click action on the old slot.
+  if(drag.armed || drag.active)
+    cancelDrag();
+
   // tabs and the take-all button come first: they are drawn in the same pass as the grids
   if(const int8_t t = tabAt(e.pos()); t>=0) {
     switchTab(size_t(t));
@@ -592,6 +597,10 @@ void InventoryMenu::mouseLeaveEvent(MouseEvent&) {
   mouseTracked = false;
   tabHover     = -1;
   takeAllHover = false;
+  // the cursor left the window mid-drag: the drop cannot be resolved, so cancel instead of leaving a
+  // ghost that follows the cursor until the next click
+  if(drag.armed || drag.active)
+    cancelDrag();
   update();
   }
 
@@ -935,7 +944,6 @@ void InventoryMenu::drawAll(Painter &p, Npc &player, DrawPass pass) {
 
   if(pass==DrawPass::Back) {
     gridsCount    = 0;
-    tabAreasCount = 0;
     takeAll.valid = false;
     }
 
@@ -1012,17 +1020,18 @@ void InventoryMenu::drawItems(Painter &p, DrawPass pass,
   if(state==State::LockPicking)
     return;
 
-  const Size cell = slotSize();
+  const Size  cell = slotSize();
+  const int   y0   = y;
+  const Rect  area (x0,y0,cell.w*wcount,cell.h*hcount);
 
   if(pass==DrawPass::Back) {
     if(tex!=nullptr) {
       p.setBrush(*tex);
-      p.drawRect(x0,y,cell.w*wcount,cell.h*hcount, 0,0,tex->w(),tex->h());
+      p.drawRect(area.x,area.y,area.w,area.h, 0,0,tex->w(),tex->h());
       }
 
     // drop target highlight while dragging
     if(drag.active && drag.target==int(side)) {
-      const Rect area(x0,y,cell.w*wcount,cell.h*hcount);
       UiDraw::fill  (p,area,UiDraw::Theme::accentSoft(0.10f));
       UiDraw::outline(p,area,UiDraw::Theme::accentSoft(0.85f),int(2*Gothic::interfaceScale(this)));
       }
@@ -1030,7 +1039,7 @@ void InventoryMenu::drawItems(Painter &p, DrawPass pass,
 
   if(pass==DrawPass::Back && gridsCount<std::size(grids)) {
     auto& g  = grids[gridsCount++];
-    g.rect   = Rect(x0,y,cell.w*wcount,cell.h*hcount);
+    g.rect   = area;
     g.side   = side;
     g.wcount = size_t(wcount);
     g.hcount = size_t(hcount);
@@ -1058,6 +1067,13 @@ void InventoryMenu::drawItems(Painter &p, DrawPass pass,
         }
       }
     y += cell.h;
+    }
+
+  if(pass==DrawPass::Back) {
+    // Explicit frame around the grid. The cell textures have no border on their outer left/top edge,
+    // which made the table look clipped against the panel there; this closes the rectangle.
+    const float scale = Gothic::interfaceScale(this);
+    UiDraw::outline(p,area,UiDraw::Theme::gridLine(),std::max(1,int(2*scale)));
     }
   }
 
@@ -1473,10 +1489,20 @@ const Inventory::ItemFilter* InventoryMenu::inventoryFilter() const {
   }
 
 int8_t InventoryMenu::tabAt(const Point& pos) const {
-  for(size_t i=0; i<tabAreasCount; ++i)
-    if(tabAreas[i].rect.contains(pos))
-      return int8_t(tabAreas[i].tab);
-  return -1;
+  // Geometric lookup instead of per-cell hit rects: any pixel inside the tab bar belongs to a tab, so
+  // there is no dead gap between cells, the outer padding of the bar is forgiving, and the result
+  // cannot go stale between two paints.
+  if(tabBar.cellW<=0 || !tabBar.strip.contains(pos))
+    return -1;
+  const int cnt = int(InventoryTabs::Count);
+  int       x   = std::clamp(pos.x, tabBar.band.x, tabBar.band.x+tabBar.band.w-1) - tabBar.band.x;
+  for(int t=0;t<cnt;++t) {
+    const int w = tabBar.cellW + (t<tabBar.extra ? 1 : 0);
+    if(x<w)
+      return int8_t(t);
+    x -= w;
+    }
+  return int8_t(cnt-1);
   }
 
 void InventoryMenu::switchTab(size_t tab) {
@@ -1539,26 +1565,26 @@ void InventoryMenu::drawTabs(Painter& p, const Rect& strip, const Page& /*page*/
 
   UiDraw::panel(p,strip,tex,0.82f,true);
 
-  // The tabs fill the strip exactly: the band is inset by the panel padding (so the cells line up
-  // with the grid below) and the leftover pixels from the integer division are spread over the first
-  // tabs, so there is no gap at the right end. In a trade window the strip spans both panels, so the
-  // band itself is capped and centred to keep the tabs a sane size.
+  // The cells are contiguous and fill the strip exactly: the band is inset by the panel padding (so
+  // the cells line up with the grid below) and the leftover pixels of the integer division are spread
+  // over the first cells. Contiguous cells also mean a click anywhere in the bar belongs to a tab.
+  // In a trade window the strip spans both panels, so the band itself is capped and centred.
   const int pp     = panelPad();
-  const int gap    = int(3*scale);
   const int maxTab = int(68*scale);
-  const int gaps   = int(cnt-1)*gap;
-  int       bandW  = std::min(strip.w - 2*pp, maxTab*int(cnt) + gaps);
+  const int bandW  = std::min(strip.w - 2*pp, maxTab*int(cnt));
   if(bandW<=0 || strip.h<=0)
     return;
   const int bandX = strip.x + (strip.w - bandW)/2;
   const int ty    = strip.y + int(4*scale);
   const int th    = strip.h - int(8*scale);
-  const int free  = bandW - gaps;
-  if(th<=0 || free<=0)
+  if(th<=0)
     return;
-  const int tw    = free / int(cnt);
-  const int extra = free - tw*int(cnt);
-  if(tw<=0)
+
+  tabBar.strip = strip;
+  tabBar.band  = Rect(bandX,ty,bandW,th);
+  tabBar.cellW = bandW / int(cnt);
+  tabBar.extra = bandW - tabBar.cellW*int(cnt);
+  if(tabBar.cellW<=0)
     return;
 
   // empty categories keep their glyph, dimmed: an empty tab reads as "nothing here", not as a hole
@@ -1569,7 +1595,7 @@ void InventoryMenu::drawTabs(Painter& p, const Rect& strip, const Page& /*page*/
   int  x = bandX;
   Rect hoverRect;
   for(size_t t=0;t<cnt;++t) {
-    const int  w = tw + (int(t)<extra ? 1 : 0);
+    const int  w = tabBar.cellW + (int(t)<tabBar.extra ? 1 : 0);
     const Rect r(x,ty,w,th);
     const bool active = t==tabs.active();
     const bool hover  = int8_t(t)==tabHover;
@@ -1595,11 +1621,9 @@ void InventoryMenu::drawTabs(Painter& p, const Rect& strip, const Page& /*page*/
       UiDraw::outline(p,r,UiDraw::Theme::accentSoft(0.7f),std::max(1,int(2*scale)));
       }
 
-    if(tabAreasCount<std::size(tabAreas))
-      tabAreas[tabAreasCount++] = TabArea{r,uint8_t(t)};
     if(hover)
       hoverRect = r;
-    x += w + gap;
+    x += w;
     }
 
   // hovered label: the bar is icon-only, so the name appears above it instead of eating grid width
