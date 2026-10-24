@@ -81,8 +81,10 @@ void selection(Tempest::Painter& p, const Tempest::Rect& r, bool strong, int wid
 // Subtle highlight used for hover states (no border).
 void hover(Tempest::Painter& p, const Tempest::Rect& r);
 
-// A floating tooltip plate: shadow + dark panel + accent hairline at the top.
-void tooltipPlane(Tempest::Painter& p, const Tempest::Rect& r, const Tempest::Texture2d* back);
+// A floating tooltip plate: shadow + dark panel + accent hairline at the top. `fillAlpha` is exposed
+// because a tooltip drawn in the front overlay pass (above the 3D item models) must be opaque.
+void tooltipPlane(Tempest::Painter& p, const Tempest::Rect& r, const Tempest::Texture2d* back,
+                  float fillAlpha = 0.92f);
 
 // Vertical scroll indicator, drawn inside `track`. Shows the visible window of `total` rows.
 void scrollBar(Tempest::Painter& p, const Tempest::Rect& track, size_t first, size_t visible, size_t total);

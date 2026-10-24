@@ -120,11 +120,11 @@ void UiDraw::hover(Painter& p, const Rect& r) {
   fill(p, r, Theme::hoverFill());
   }
 
-void UiDraw::tooltipPlane(Painter& p, const Rect& r, const Texture2d* back) {
+void UiDraw::tooltipPlane(Painter& p, const Rect& r, const Texture2d* back, float fillAlpha) {
   if(r.w<=0 || r.h<=0)
     return;
   shadow(p,r,int(std::max(3.f,float(r.h)*0.04f)));
-  panel(p,r,back,0.92f,true);
+  panel(p,r,back,fillAlpha,true);
   // accent hairline on top edge: reads as "this window belongs to the active UI"
   fill(p,Rect(r.x,r.y,r.w,std::max(1,r.h/120)),withAlpha(accentColor,0.55f));
   }

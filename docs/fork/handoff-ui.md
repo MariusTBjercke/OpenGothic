@@ -164,6 +164,11 @@ Gotchas:
 - A double click arrives as `mouseDoubleClickEvent` *instead of* a second `mouseDownEvent`, and the
   first click already acted on release. Do not act on the second click in the same way (that is why
   double click is a no-op in the equip state and "whole stack" in containers).
+- **Draw order of the inventory:** `Renderer::draw` paints the UI layer, then the 3D item models, then
+  the *front overlay* (`InventoryMenu::paintNumOverlay`, `DrawPass::Front`). Anything drawn in the
+  normal UI layer ends up *under* the item models — that is why the tooltip lives in the front pass now
+  and uses a near-opaque plate (`UiDraw::tooltipPlane(..., 0.98f)`). Keep it there, and keep the plate
+  opaque, or the icons will float over the tooltip text again.
 - The hold-to-repeat timer starts on press. A player who presses, hesitates and then starts to drag
   used to take one item before the drag began; a movement of more than 1 px now restarts the delay
   (`mouseDragEvent`). Keep that if you touch the timer.
@@ -174,8 +179,12 @@ Gotchas:
 
 - `InventoryMenu::drawHints` draws the screen-level hint line; there is no per-panel footer any more
   (it clipped the text on 4K). The trader header shows `N items` when there is no "Take all" button.
-- The tab strip is capped at `68*scale` per tab and centred over the panels, so a trade window does
-  not stretch eleven tabs across the whole screen.
+- The tab strip is flush on top of the panels and exactly as wide as the content (one panel in equip
+  mode, both in a trade window): `drawAll` places it at `iy-hdrH-pp-tabH`, `drawTabs` insets the cells by
+  the panel padding and spreads the integer-division remainder over the first tabs so there is no gap at
+  the right end. In a trade window the cell band is capped at `68*scale` per tab and centred inside the
+  strip, so the tabs do not stretch over both panels.
+- The item tooltip is drawn in the front overlay pass (see the draw-order gotcha above).
 
 ## Gotchas learned the hard way
 

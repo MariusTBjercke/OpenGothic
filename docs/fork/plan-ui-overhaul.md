@@ -51,9 +51,10 @@ fields, item icons for tabs, a re-layout of the scripted main menu geometry.
 - [x] Dim backdrop behind the window (`invScrim`).
 - [x] Frames: player panel (header with title + gold, grid) and the container/trader panel (header with
       name, take-all button or item count), both with a dark fill so the world no longer shows through
-      the slot grid. A tool-strip style tab bar sits above them.
+      the slot grid. The tab bar is flush on top of the panels and exactly as wide as the content.
 - [x] Hover: the selected slot follows the cursor, item tooltip at the cursor (`invTooltip`) with the
-      stat rows and the sell price in trade; the info box stays for keyboard-only play.
+      stat rows and the sell price in trade; the info box stays for keyboard-only play. The tooltip is
+      drawn in the front overlay pass, so the 3D item models do not float over its text.
 - [x] Tabs: 11 categories (melee, ranged, armor, potions, food, magic, writings, trophies, keys, other)
       matched from `mainFlag` with an instance-name fallback for `ItAt_`/`ItKe_`; one active tab filters
       **both** sides; tab tooltip with the label; empty tabs dimmed; accent underline on the active tab.

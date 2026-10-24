@@ -968,6 +968,7 @@ void InventoryMenu::drawAll(Painter &p, Npc &player, DrawPass pass) {
     }
 
   // 3. panels (frames + headers) first, so the slots are drawn on top
+  const int tabH = isTabsMode() ? int(44*scale) : 0;
   if(pass==DrawPass::Back) {
     for(size_t i=0;i<sidesCount;++i) {
       auto& s = sides[i];
@@ -975,17 +976,12 @@ void InventoryMenu::drawAll(Painter &p, Npc &player, DrawPass pass) {
       const Rect header(s.x, iy-hdrH, gridW, hdrH);
       drawPanel(p,panel,header,s.isPlayer,s.title);
       }
-    // tab strip above the panels: one bar for both sides, so the filter obviously applies to both
+    // Tab strip: exactly as wide as the panel(s), flush on top of them (no gap, no inset), so it
+    // reads as a toolbar of the window instead of a floating element.
     if(isTabsMode() && sidesCount>0) {
-      const int stripH  = int(40*scale);
-      const int gapY    = int(6*scale);
-      const int x0      = sides[0].x;
-      const int x1      = sides[sidesCount-1].x + gridW;
-      // cap the tab width: a strip stretched over both panels looks sparse in the trade view
-      const int maxTab  = int(68*scale);
-      const int gaps    = int(InventoryTabs::Count-1)*int(3*scale);
-      const int stripW  = std::min(x1-x0, maxTab*int(InventoryTabs::Count)+gaps);
-      const Rect strip(x0+(x1-x0-stripW)/2, iy-hdrH-pp-gapY-stripH, stripW, stripH);
+      const int x0 = sides[0].x - pp;
+      const int x1 = sides[sidesCount-1].x + gridW + pp;
+      const Rect strip(x0, iy-hdrH-pp-tabH, x1-x0, tabH);
       drawTabs(p,strip,*pagePl);
       }
     }
@@ -1001,8 +997,12 @@ void InventoryMenu::drawAll(Painter &p, Npc &player, DrawPass pass) {
     if(!isMouseMode())
       drawInfo(p);
     drawHints(p);
-    drawTooltip(p);
     drawDragGhost(p);
+    } else {
+    // The tooltip goes into the front overlay pass: the 3D item models are drawn *between* the two
+    // UI layers (Renderer::draw), so a tooltip in the normal UI layer had the icons floating on top
+    // of its text. The plate is near-opaque because it has to hide those models.
+    drawTooltip(p);
     }
   }
 
@@ -1295,7 +1295,8 @@ void InventoryMenu::drawTooltip(Painter& p) {
   y = std::clamp(y,8,std::max(8,h()-tipH-8));
 
   const Rect r(x,y,tipW,tipH);
-  UiDraw::tooltipPlane(p,r,tex);
+  // near-opaque: this is drawn in the front overlay pass, over the 3D item models
+  UiDraw::tooltipPlane(p,r,tex,0.98f);
 
   int ty = r.y + pad;
   fntH.drawText(p,r.x+pad,ty+lh,name);
@@ -1538,22 +1539,38 @@ void InventoryMenu::drawTabs(Painter& p, const Rect& strip, const Page& /*page*/
 
   UiDraw::panel(p,strip,tex,0.82f,true);
 
-  const int gap = int(3*scale);
-  const int tw  = int((strip.w - int(cnt-1)*gap) / int(cnt));
-  const int th  = strip.h - int(6*scale);
-  if(tw<=0 || th<=0)
+  // The tabs fill the strip exactly: the band is inset by the panel padding (so the cells line up
+  // with the grid below) and the leftover pixels from the integer division are spread over the first
+  // tabs, so there is no gap at the right end. In a trade window the strip spans both panels, so the
+  // band itself is capped and centred to keep the tabs a sane size.
+  const int pp     = panelPad();
+  const int gap    = int(3*scale);
+  const int maxTab = int(68*scale);
+  const int gaps   = int(cnt-1)*gap;
+  int       bandW  = std::min(strip.w - 2*pp, maxTab*int(cnt) + gaps);
+  if(bandW<=0 || strip.h<=0)
     return;
-  const int ty = strip.y + int(3*scale);
+  const int bandX = strip.x + (strip.w - bandW)/2;
+  const int ty    = strip.y + int(4*scale);
+  const int th    = strip.h - int(8*scale);
+  const int free  = bandW - gaps;
+  if(th<=0 || free<=0)
+    return;
+  const int tw    = free / int(cnt);
+  const int extra = free - tw*int(cnt);
+  if(tw<=0)
+    return;
 
   // empty categories keep their glyph, dimmed: an empty tab reads as "nothing here", not as a hole
   bool has[InventoryTabs::Count] = {};
   if(player!=nullptr)
     tabs.categories(player->inventory(), has);
 
-  int  x = strip.x;
+  int  x = bandX;
   Rect hoverRect;
   for(size_t t=0;t<cnt;++t) {
-    const Rect r(x,ty,tw,th);
+    const int  w = tw + (int(t)<extra ? 1 : 0);
+    const Rect r(x,ty,w,th);
     const bool active = t==tabs.active();
     const bool hover  = int8_t(t)==tabHover;
     const Texture2d* bt = (active || hover) ? selT : slot;
@@ -1562,8 +1579,8 @@ void InventoryMenu::drawTabs(Painter& p, const Rect& strip, const Page& /*page*/
       p.drawRect(r.x,r.y,r.w,r.h, 0,0,bt->w(),bt->h());
       }
 
-    const int m = std::max(int(3*scale), std::min(tw,th)/10);
-    const int s = std::min(tw,th) - 2*m;
+    const int m = std::max(int(3*scale), std::min(w,th)/10);
+    const int s = std::min(w,th) - 2*m;
     if(s>0) {
       const Rect  ir(r.x+(r.w-s)/2, r.y+(r.h-s)/2, s, s);
       const float alpha = !has[t] ? 0.28f : (active || hover ? 1.f : 0.86f);
@@ -1582,7 +1599,7 @@ void InventoryMenu::drawTabs(Painter& p, const Rect& strip, const Page& /*page*/
       tabAreas[tabAreasCount++] = TabArea{r,uint8_t(t)};
     if(hover)
       hoverRect = r;
-    x += tw + gap;
+    x += w + gap;
     }
 
   // hovered label: the bar is icon-only, so the name appears above it instead of eating grid width
