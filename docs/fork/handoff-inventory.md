@@ -1,5 +1,10 @@
 # Handoff: mouse-first inventory (branch `feat/inventory-ui`)
 
+> **Partly superseded (2026-10-24):** the inventory was reworked into the broader UI overhaul
+> (`docs/fork/plan-ui-overhaul.md`, handoff `docs/fork/handoff-ui.md`). Iterations A and B are done, the
+> panel layout/tooltip/drag & drop details in this file are out of date; the keyboard/gotcha notes and
+> the test harness section below are still valid. Read the newer handoff first.
+
 Self-contained handoff for a fresh session. Read `AGENTS.md` first, then `docs/fork/plan-inventory.md` (goal,
 design decisions, iteration checklist). This file is the current state, the next step and the things that cost time
 to rediscover. Session log at the bottom, newest first.

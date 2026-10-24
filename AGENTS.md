@@ -131,11 +131,17 @@ Keep these when merging upstream changes:
 - **Weather / rain** (fork): `common/world/weather.*`, owned by `World` (`world.weather()`). Reference behavior of
   the original and current status in `docs/fork/research/rain.md`; open checks, gotchas and next steps in
   `docs/fork/handoff-rain.md`. Lighting hook in `shader/lighting/sky_exposure.comp` (push constant `rain`).
-- **Inventory UI** (fork, in progress): mouse-first controls, category tabs and a take-all button in
-  `common/ui/inventorymenu.*` plus `common/ui/inventorytabs.*`; `[GAME] invMouse` / `[GAME] invTabs` switch them.
-  Goal, design and iteration checklist in `docs/fork/plan-inventory.md`; status and next step in
-  `docs/fork/handoff-inventory.md`. Inventory, dialog choices and HUD are OpenGothic C++ (hardcoded in the original
-  exe too); only the main/options/save/status menus come from Daedalus scripts (`gamemenu.cpp`).
+- **UI (fork, modernised)**: mouse-first inventory (framed panels, category tabs, cursor tooltip, drag &
+  drop, take-all) in `common/ui/inventorymenu.*` + `inventorytabs.*`; mouse support for dialog choices
+  (`dialogmenu.*`), scripted menus (`gamemenu.*`, hover/click/slider drag) and documents
+  (`documentmenu.*`); the shared drawing kit is `common/ui/uidraw.*`. Everything is switchable in
+  `[GAME]`: `invMouse`, `invTabs`, `invScrim`, `invTooltip`, `dlgMouse`, `menuMouse`, `docMouse`
+  (defaults in `common/gothic.cpp`). Fullscreen keeps the cursor free while a mouse-driven window is
+  open (`MainWindow::uiOwnsMouse`). Design and phases in `docs/fork/plan-ui-overhaul.md`, status and the
+  screenshot harness in `docs/fork/handoff-ui.md`; the earlier inventory-only plan and handoff are
+  `docs/fork/plan-inventory.md` and `docs/fork/handoff-inventory.md`. Inventory, dialog choices and HUD
+  are OpenGothic C++ (hardcoded in the original exe too); only the main/options/save/status menus come
+  from Daedalus scripts (`gamemenu.cpp`).
 - **Run console commands at startup** (fork): `-marvin "set time 13 0;zstartrain 0.5"` executes `;`-separated
   marvin commands after the first frame that drew the world (`MainWindow::runStartupMarvinCmds`, called from
   `render`) and logs `marvin: "<cmd>"` or `marvin: "<cmd>" failed`; what a command prints is logged as

@@ -7,10 +7,11 @@ time to rediscover.
 
 ## Where things stand (2026-10-24, night session)
 
-Branch `feat/inventory-ui`, working tree has the UI overhaul, **not committed yet** at the time of
-writing (the session log at the bottom says what landed). Build is green
-(`scripts/build-windows.ps1 -Target Gothic2Notr`), benchmark smoke test passes with the same warning
-set as before (see `build/smoke/summary.json`).
+Branch `feat/inventory-ui`, **committed** (`cd9f0f78` is the docs commit on top; the feature commits
+are `b686bfb1`, `168a087f`, `c3535664`, `0b79df26`, `f454a21a`, `d5a7fc1f`, `c8b6f96b`), working tree
+clean. Build is green (`scripts/build-windows.ps1 -Target Gothic2Notr`), benchmark smoke test passes:
+76 fps, 13 unique warnings, the same set as before this work. Deployed to `D:\GothicDev\OpenGothic-play`
+with `scripts/deploy-play.ps1` at the end of the session (see `BUILD.txt` there).
 
 Shipped in this pass:
 
@@ -53,26 +54,32 @@ Settings, all in `[GAME]` with defaults in `common/gothic.cpp`:
 
 Verified by the agent with synthetic input and screenshots (run dirs under `build/`, kept locally):
 
-- inventory: hover selects and shows the tooltip (`build/ui-inv5/shot_26s.png`), single click uses one
-  item (apple 20 -> 19, `shot_37s.png`), drag shows the ghost with the stack count and cancels when
-  released outside a grid (`drag_37.png`), tab click filters the grid, tab hover shows the label,
-  keyboard navigation still works with `invMouse=0 invTabs=0` (`build/ui-kbd/shot_27s.png`, info box
-  with the dark plate, no tabs).
+- inventory: hover selects and shows the tooltip (`build/ui-final/shot_36s.png`), single click uses one
+  item (apple 20 -> 19, `build/ui-inv5/shot_37s.png`), drag shows the ghost with the live stack count and
+  cancels when released outside a grid (`build/ui-inv5/drag_37.png`), tab click filters the grid, tab
+  hover shows the label, keyboard navigation still works with `invMouse=0 invTabs=0`
+  (`build/ui-kbd/shot_27s.png`).
+- **trade layout and drag both ways** (`build/ui-trade4/`): two panels ("Kardif" with its item count,
+  "Inventory" with gold), one shared tab strip, hint line, tooltip with the sell price; dragging the
+  apple stack from the player grid onto the trader grid sells the stack (the trader's stack grew from 1
+  to 20 while the player's gold went up), dragging the trader's stack back buys (clamped by the player's
+  gold). This used a temporary `F8` test hook (nearest NPC -> `inventory.trade`), removed again; the
+  recipe is at the bottom of the harness section.
 - dialogs: hovering a choice selects it and shows the accent band; clicking a choice takes it
   (`build/ui-dlg4/`), the choice panel no longer clips its last row.
-- main menu: hover changes the selection (the help line at the bottom follows), clicking "Options"
-  opens the options menu (`build/ui-menu2/shot_16s.png`).
-- build + benchmark smoke test.
+- main menu: hover changes the selection (the help line at the bottom follows) and shows the gold
+  marker, clicking "Options" opens the options menu (`build/ui-menu4/shot_12.png`).
+- build + benchmark smoke test (twice, before and after the final fixes).
 
-**Not verified by the agent** (needs the user, a container, or a console command that opens one):
+**Not verified by the agent** (needs the user or a specific spot in the world):
 
-- the actual chest/trade/ransack drops (drag onto the other grid) — there is no console command to
-  open a container or a trader, so only the cancel path and the equip-state ghost could be exercised;
-- double click on a stack inside a container (the code path is shared with drag);
-- `Shift+A` take all (button path was verified in an earlier session);
+- chest and ransack drops (the trade path is verified; chest/ransack use the same `resolveDrop` branches
+  but no container was opened) and the "Take all" button in a real chest;
+- double click for whole stacks inside a container (the code path is shared with the drop);
+- `Shift+A` take all;
 - fullscreen cursor behaviour (the harness runs `-window`);
-- the fine category mapping for keys/trophies against real game data (no dump of the instance names
-  was made; flags decide first, prefixes only for `ItAt_`/`ItKe_`).
+- the fine category mapping for keys/trophies against real game data (no dump of the instance names was
+  made; flags decide first, prefixes only for `ItAt_`/`ItKe_`).
 
 ## Next steps (suggested order)
 
@@ -119,6 +126,26 @@ powershell -ExecutionPolicy Bypass -File build/ui-menu-input.ps1
 
 Keyboard-mode regression: `-Ini "[GAME]`r`ninvMouse=0`r`ninvTabs=0"`.
 
+Opening a trade window for a UI test (no console command exists for it; this is the recipe that worked,
+remove it again before committing): add a temporary block at the top of `MainWindow::keyDownEvent` bound
+to a key without a `Shortcut` (F8 or F10; F10 was taken by `funcKey`), find the nearest NPC and open the
+window:
+
+```cpp
+  if(event.key==Event::K_F8) {
+    auto pl = Gothic::inst().player();
+    Npc* other = nullptr;
+    if(auto w = Gothic::inst().world())
+      w->detectNpcNear([&](Npc& n){ if(other==nullptr && &n!=pl) other=&n; });
+    if(pl!=nullptr && other!=nullptr)
+      inventory.trade(*pl,*other);
+    event.accept();
+    return;
+    }
+```
+
+Then drive it like the inventory (left panel = trader grid at x 96..881, right = player grid).
+
 Gotchas:
 
 - **The input script's clock is ~3 s behind the screenshot clock** (it starts after the harness), so a
@@ -134,6 +161,18 @@ Gotchas:
 - A double click arrives as `mouseDoubleClickEvent` *instead of* a second `mouseDownEvent`, and the
   first click already acted on release. Do not act on the second click in the same way (that is why
   double click is a no-op in the equip state and "whole stack" in containers).
+- The hold-to-repeat timer starts on press. A player who presses, hesitates and then starts to drag
+  used to take one item before the drag began; a movement of more than 1 px now restarts the delay
+  (`mouseDragEvent`). Keep that if you touch the timer.
+- The in-game client area and the screenshot differ by ~14 px at the top (window frame). All mouse
+  coordinates in the input scripts are client coordinates, `PrintWindow` captures the whole window.
+
+## Code map additions after the first pass
+
+- `InventoryMenu::drawHints` draws the screen-level hint line; there is no per-panel footer any more
+  (it clipped the text on 4K). The trader header shows `N items` when there is no "Take all" button.
+- The tab strip is capped at `68*scale` per tab and centred over the panels, so a trade window does
+  not stretch eleven tabs across the whole screen.
 
 ## Gotchas learned the hard way
 
