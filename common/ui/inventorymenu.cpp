@@ -270,7 +270,10 @@ void InventoryMenu::tick(uint64_t /*dt*/) {
       return;
       }
 
-    auto it = trader->inventory().iterator(Inventory::T_Ransack,inventoryFilter());
+    // Note: deliberately without the category filter. The filter describes what the *active tab* shows,
+    // not whether there is anything left to loot — using it here closed the window as soon as the
+    // player switched to a category the corpse has no items in.
+    auto it = trader->inventory().iterator(Inventory::T_Ransack);
     if(!it.isValid())
       close();
     }
@@ -1559,12 +1562,15 @@ void InventoryMenu::switchTab(size_t tab) {
   if(!isTabsMode() || tab>=InventoryTabs::Count || tab==tabs.active())
     return;
 
-  tabLocal[tabs.active()] = pageLocal[1];
-  tabs.setActive(tab);
-  pageLocal[1] = tabLocal[tab];
+  // The bar sits above the player panel in equip/chest/trade, but above the corpse panel when looting
+  // (ransack only draws that side), so remember the selection of the grid the bar actually belongs to.
+  const uint8_t side = (state==State::Ransack) ? 0 : 1;
 
-  if(pageOth!=nullptr)
-    page = 1; // the tab bar belongs to the player grid
+  tabLocal[tabs.active()] = pageLocal[side];
+  tabs.setActive(tab);
+  pageLocal[side] = tabLocal[tab];
+
+  page = side;   // make the side that owns the bar the active one
   adjustScroll();
   Gothic::inst().emitGlobalSound("INV_CHANGE");
   }
