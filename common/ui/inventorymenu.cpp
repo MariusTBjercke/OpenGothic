@@ -488,7 +488,7 @@ void InventoryMenu::mouseDownEvent(MouseEvent &e) {
   // holding the button still repeats "take one" after a delay; a quick release acts once
   takeCount = 0;
   lootMode  = LootMode::Normal;
-  takeTimer.start(350);
+  takeTimer.start(600);
 
   adjustScroll();
   update();
@@ -550,8 +550,15 @@ void InventoryMenu::mouseDragEvent(MouseEvent& e) {
 
   if(!drag.active) {
     const int thr = int(8*Gothic::interfaceScale(this));
-    if(std::abs(e.pos().x-drag.start.x)<thr && std::abs(e.pos().y-drag.start.y)<thr)
+    const int dx  = std::abs(e.pos().x-drag.start.x);
+    const int dy  = std::abs(e.pos().y-drag.start.y);
+    if(dx<thr && dy<thr) {
+      // A small movement is still a hold, but it postpones the repeat: a player who starts moving
+      // to drag must never trigger the "hold to take one" action while doing so.
+      if(dx>1 || dy>1)
+        takeTimer.start(600);
       return;
+      }
     drag.active   = true;
     drag.repeated = false;
     takeTimer.stop();
@@ -738,8 +745,8 @@ size_t InventoryMenu::rowsCount() const {
   const int   y0    = gridTop();
   int         bottom;
   if(isMouseMode()) {
-    // the cursor tooltip replaces the info box, so the panel gets the space instead
-    bottom = footerH() + 2*panelPad() + int(10*scale);
+    // the cursor tooltip replaces the info box; the hint line lives under the panels
+    bottom = int(30*scale) + 2*panelPad() + int(10*scale);
     } else {
     bottom = infoHeight() + int(20*scale);
     }
@@ -762,12 +769,6 @@ int InventoryMenu::panelPad() const {
 
 int InventoryMenu::headerH() const {
   return int(36*Gothic::interfaceScale(this));
-  }
-
-int InventoryMenu::footerH() const {
-  if(!isMouseMode())
-    return 0;
-  return int(34*Gothic::interfaceScale(this));
   }
 
 void InventoryMenu::paintEvent(PaintEvent &e) {
@@ -925,7 +926,6 @@ void InventoryMenu::drawAll(Painter &p, Npc &player, DrawPass pass) {
   const int    iy       = gridTop();
   const int    pp       = panelPad();
   const int    hdrH     = headerH();
-  const int    ftrH     = footerH();
   const Size   cell     = slotSize();
   const int    wcount   = int(columsCount);
   const int    hcount   = int(rowsCount());
@@ -967,22 +967,25 @@ void InventoryMenu::drawAll(Painter &p, Npc &player, DrawPass pass) {
     sides[sidesCount++] = Side{pagePl.get(),&pageLocal[1],true,"Inventory",w()-padd-gridW};
     }
 
-  // 3. panels (frames + headers + footers) first, so the slots are drawn on top
+  // 3. panels (frames + headers) first, so the slots are drawn on top
   if(pass==DrawPass::Back) {
     for(size_t i=0;i<sidesCount;++i) {
       auto& s = sides[i];
-      const Rect panel(s.x-pp, iy-hdrH-pp, gridW+2*pp, hdrH+gridH+ftrH+2*pp);
+      const Rect panel(s.x-pp, iy-hdrH-pp, gridW+2*pp, hdrH+gridH+2*pp);
       const Rect header(s.x, iy-hdrH, gridW, hdrH);
-      const Rect footer(s.x, iy+gridH, gridW, ftrH);
-      drawPanel(p,panel,header,footer,s.isPlayer,s.title);
+      drawPanel(p,panel,header,s.isPlayer,s.title);
       }
     // tab strip above the panels: one bar for both sides, so the filter obviously applies to both
     if(isTabsMode() && sidesCount>0) {
-      const int stripH = int(40*scale);
-      const int gapY   = int(6*scale);
-      const int x0     = sides[0].x;
-      const int x1     = sides[sidesCount-1].x + gridW;
-      const Rect strip(x0, iy-hdrH-pp-gapY-stripH, x1-x0, stripH);
+      const int stripH  = int(40*scale);
+      const int gapY    = int(6*scale);
+      const int x0      = sides[0].x;
+      const int x1      = sides[sidesCount-1].x + gridW;
+      // cap the tab width: a strip stretched over both panels looks sparse in the trade view
+      const int maxTab  = int(68*scale);
+      const int gaps    = int(InventoryTabs::Count-1)*int(3*scale);
+      const int stripW  = std::min(x1-x0, maxTab*int(InventoryTabs::Count)+gaps);
+      const Rect strip(x0+(x1-x0-stripW)/2, iy-hdrH-pp-gapY-stripH, stripW, stripH);
       drawTabs(p,strip,*pagePl);
       }
     }
@@ -997,6 +1000,7 @@ void InventoryMenu::drawAll(Painter &p, Npc &player, DrawPass pass) {
   if(pass==DrawPass::Back) {
     if(!isMouseMode())
       drawInfo(p);
+    drawHints(p);
     drawTooltip(p);
     drawDragGhost(p);
     }
@@ -1106,7 +1110,7 @@ void InventoryMenu::drawSlot(Painter &p, DrawPass pass, const Inventory::Iterato
   }
 
 void InventoryMenu::drawPanel(Painter& p, const Rect& panel, const Rect& header,
-                              const Rect& footer, bool playerSide, std::string_view title) {
+                              bool playerSide, std::string_view title) {
   const float scale = Gothic::interfaceScale(this);
 
   UiDraw::shadow(p,panel,int(4*scale));
@@ -1120,34 +1124,41 @@ void InventoryMenu::drawPanel(Painter& p, const Rect& panel, const Rect& header,
   auto& fntH = Resources::font(Resources::FontType::Hi, scale);
   UiDraw::textLeft(p,fntH,header,title,int(10*scale));
 
-  if(playerSide)
-    drawGold(p,header.x,header.y,header.w); else
-    drawTakeAll(p,header);
-
-  if(footer.h<=0)
-    return;
-
-  UiDraw::fill(p,footer,Color(0,0,0,0.28f));
-  auto& fntD = Resources::font(Resources::FontType::Disabled, scale);
   if(playerSide) {
-    if(isMouseMode())
-      UiDraw::textCenter(p,fntD,footer,hints());
-    } else {
-    if(pageOth!=nullptr) {
-      string_frm cnt(int(pageOth->size())," items");
-      UiDraw::textCenter(p,fntD,footer,cnt);
-      }
+    drawGold(p,header.x,header.y,header.w);
+    } else
+  if((state==State::Chest || state==State::Ransack) && pageOth!=nullptr && pageOth->size()>0) {
+    drawTakeAll(p,header);
+    } else
+  if(pageOth!=nullptr) {
+    // trade: the trader has no take-all, show how much is on offer instead
+    auto&     fntD = Resources::font(Resources::FontType::Disabled, scale);
+    string_frm cnt(int(pageOth->size())," items");
+    UiDraw::textRight(p,fntD,header,cnt,int(10*scale));
     }
   }
 
 std::string_view InventoryMenu::hints() const {
   switch(state) {
-    case State::Equip:   return "Click: use / equip   |   Right click: close";
-    case State::Chest:   return "Drag: move   |   Double click: take stack   |   Right click: close";
-    case State::Trade:   return "Drag: sell / buy   |   Double click: stack   |   Right click: close";
-    case State::Ransack: return "Drag: take   |   Double click: take stack   |   Right click: close";
+    case State::Equip:   return "Click: use / equip      Right click: close";
+    case State::Chest:   return "Drag: move      Double click: whole stack      Right click: close";
+    case State::Trade:   return "Drag: sell / buy      Double click: whole stack      Right click: close";
+    case State::Ransack: return "Drag: take      Double click: whole stack      Right click: close";
     default:             return "";
     }
+  }
+
+void InventoryMenu::drawHints(Painter& p) {
+  if(!isMouseMode())
+    return;
+  const float scale = Gothic::interfaceScale(this);
+  auto&       fnt   = Resources::font(Resources::FontType::Disabled, scale);
+  const auto  hint  = hints();
+  const auto  sz    = fnt.textSize(hint);
+  const Rect  r((w()-sz.w)/2-int(14*scale), h()-int(12*scale)-sz.h-int(6*scale),
+                sz.w+int(28*scale), sz.h+int(10*scale));
+  UiDraw::textPlate(p,r,0.40f);
+  UiDraw::textCenter(p,fnt,r,hint);
   }
 
 void InventoryMenu::drawGold(Painter& p, int x, int y, int w) {
@@ -1323,9 +1334,9 @@ void InventoryMenu::drawDragGhost(Painter& p) {
   UiDraw::fill(p,Rect(x,y,sz,sz),Color(0,0,0,0.22f));
   renderer.drawItem(x,y,sz,sz,*item);
 
-  if(drag.count>1) {
+  if(item->count()>1) {
     auto&      fnt = Resources::font(scale);
-    string_frm cnt("x",int(drag.count));
+    string_frm cnt("x",int(item->count()));
     const auto cs  = fnt.textSize(cnt);
     const Rect tr(x+sz-cs.w-int(6*scale),y+sz-cs.h-int(2*scale),cs.w+int(10*scale),cs.h+int(2*scale));
     UiDraw::fill(p,tr,Color(0,0,0,0.55f));

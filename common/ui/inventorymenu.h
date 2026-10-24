@@ -161,7 +161,6 @@ class InventoryMenu : public Tempest::Widget {
     int                       padd() const;
     int                       panelPad() const;
     int                       headerH() const;
-    int                       footerH() const;
 
     Tempest::Size             slotSize() const;
     int                       infoHeight() const;
@@ -188,10 +187,11 @@ class InventoryMenu : public Tempest::Widget {
     void          drawGold  (Tempest::Painter& p, int x, int y, int w);
     void          drawInfo  (Tempest::Painter& p);
     void          drawPanel (Tempest::Painter& p, const Tempest::Rect& panel, const Tempest::Rect& header,
-                             const Tempest::Rect& footer, bool playerSide, std::string_view title);
+                             bool playerSide, std::string_view title);
     void          drawTabs  (Tempest::Painter& p, const Tempest::Rect& strip, const Page& page);
     void          drawTakeAll(Tempest::Painter& p, const Tempest::Rect& header);
     void          drawTooltip(Tempest::Painter& p);
+    void          drawHints (Tempest::Painter& p);
     void          drawDragGhost(Tempest::Painter& p);
     std::string_view hints() const;
 
