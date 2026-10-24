@@ -9,7 +9,8 @@ using namespace Tempest;
 
 MenuRoot::MenuRoot(KeyCodec& keyCodec)
   :keyCodec(keyCodec) {
-  setCursorShape(CursorShape::Hidden);
+  // fork: scripted menus can be driven with the mouse ([GAME] menuMouse), so the cursor stays visible
+  setCursorShape(Gothic::settingsGetI("GAME","menuMouse")!=0 ? CursorShape::Arrow : CursorShape::Hidden);
 
   Gothic::inst().onSettingsChanged.bind(this,&MenuRoot::initSettings);
   initSettings();

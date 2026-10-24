@@ -37,6 +37,12 @@ class GameMenu : public Tempest::Widget {
     void paintEvent (Tempest::PaintEvent& event) override;
     void resizeEvent(Tempest::SizeEvent&  event) override;
 
+    // fork: mouse support ([GAME] menuMouse), see docs/fork/plan-ui-overhaul.md
+    void mouseDownEvent(Tempest::MouseEvent& event) override;
+    void mouseUpEvent  (Tempest::MouseEvent& event) override;
+    void mouseMoveEvent(Tempest::MouseEvent& event) override;
+    void mouseDragEvent(Tempest::MouseEvent& event) override;
+
   private:
     enum class QuestStat : uint8_t {
       Current   = uint8_t(QuestLog::Status::Running),
@@ -58,6 +64,9 @@ class GameMenu : public Tempest::Widget {
       int32_t                             value   = 0;
       int32_t                             scroll  = 0;
       bool                                visible = true;
+      // fork: rect recorded while painting, used by the mouse hit test
+      Tempest::Rect                       rect;
+      bool                                hasRect = false;
       };
 
     MenuRoot&                             owner;
@@ -128,4 +137,16 @@ class GameMenu : public Tempest::Widget {
     void                                  set(std::string_view item, const int32_t  value);
     void                                  set(std::string_view item, const int32_t  value, const int32_t max);
     void                                  set(std::string_view item, std::string_view value);
+
+    // fork: mouse support
+    bool                                  isMouseMode() const;
+    Item*                                 itemAt (const Tempest::Point& p);
+    int                                   indexOf(const Item* it) const;
+    void                                  hoverAt(const Tempest::Point& p);
+    void                                  setSlider(Item& it, int relX);
+    void                                  activate(Item& it, int slideDx);
+
+    Tempest::Point                        mousePos;
+    Item*                                 pressItem  = nullptr;
+    Item*                                 sliderDrag = nullptr;
   };

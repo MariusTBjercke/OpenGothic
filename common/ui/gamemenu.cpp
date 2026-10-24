@@ -14,6 +14,7 @@
 #include "utils/gthfont.h"
 #include "utils/fileutil.h"
 #include "utils/keycodec.h"
+#include "ui/uidraw.h"
 #include "game/definitions/musicdefinitions.h"
 #include "game/serialize.h"
 #include "game/savegameheader.h"
@@ -266,7 +267,10 @@ struct GameMenu::SavNameDialog : Dialog {
 
 GameMenu::GameMenu(MenuRoot &owner, KeyCodec& keyCodec, zenkit::DaedalusVm& vm, std::string_view menuSection, KeyCodec::Action kClose)
   :owner(owner), keyCodec(keyCodec), vm(&vm), kClose(kClose) {
-  setCursorShape(CursorShape::Hidden);
+  // fork: the mouse can hover/click this menu ([GAME] menuMouse)
+  if(Gothic::settingsGetI("GAME","menuMouse")!=0)
+    setCursorShape(CursorShape::Arrow); else
+    setCursorShape(CursorShape::Hidden);
   timer.timeout.bind(this,&GameMenu::onTick);
   timer.start(100);
 
@@ -378,6 +382,9 @@ void GameMenu::initItems() {
 void GameMenu::paintEvent(PaintEvent &e) {
   const float scale = Gothic::interfaceScale(this);
 
+  for(auto& i:hItems)
+    i.hasRect = false;
+
   Painter p(e);
   p.setScissor(-x(),-y(),owner.w(),owner.h());
 
@@ -427,6 +434,10 @@ void GameMenu::drawItem(Painter& p, Item& hItem) {
   int         szX   = int(float(w()*dimx       )/scriptDiv);
   int         szY   = int(float(h()*dimy       )/scriptDiv);
 
+  // fork: remember where the item was drawn, so the mouse can hit it
+  hItem.rect    = Rect(x,y,szX,szY);
+  hItem.hasRect = true;
+
   if(hItem.img && !hItem.img->isEmpty()) {
     p.setBrush(*hItem.img);
     p.drawRect(x,y,szX,szY,
@@ -471,6 +482,23 @@ void GameMenu::drawItem(Painter& p, Item& hItem) {
       }
     } else {
     tRect.h = std::max(tRect.h, fnt.pixelSize());
+    }
+
+  // fork: a visible marker on the selected item. The highlight font alone is not visible in every
+  // menu (the main menu renders both fonts almost identically), which made mouse hover a guess.
+  // A bar to the left of the text is safer than an underline: the bitmap fonts have no consistent
+  // baseline, and an underline collided with the next row in the main menu.
+  if(&hItem==selectedItem() && isSelectable(item) &&
+     !(flags & zenkit::MenuItemFlag::MULTILINE) &&
+     (hItem.img==nullptr || hItem.img->isEmpty())) {
+    const float scale = Gothic::interfaceScale(this);
+    const auto  sz    = fnt.textSize(textBuf.data());
+    int tx = tRect.x;
+    if(flags & zenkit::MenuItemFlag::CENTERED)
+      tx = tRect.x + (tRect.w - sz.w)/2;
+    const int barW = std::max(2,int(3*scale));
+    const int barH = std::max(6,int(float(sz.h)*0.85f));
+    UiDraw::fill(p,Rect(tx-int(16*scale),tRect.y-barH,barW,barH),UiDraw::Theme::accentSoft(0.9f));
     }
 
   fnt.drawText(p, tRect.x,tRect.y, tRect.w, tRect.h,
@@ -1257,4 +1285,145 @@ void GameMenu::setPlayer(const Npc &pl) {
     set(string_frm("MENU_ITEM_TALENT_",i,"_SKILL"), strEnum(talV->get_string(i),sk,textBuf));
     set(string_frm("MENU_ITEM_TALENT_",i),          string_frm(val,"%"));
     }
+  }
+
+// ---------------------------------------------------------------------------------------------
+// fork: mouse support ([GAME] menuMouse), see docs/fork/plan-ui-overhaul.md
+//
+// Every item records its rect while painting (Item::rect/hasRect); the handlers only hit what was
+// actually drawn. Keyboard behaviour is untouched: hovering just drives the existing selection.
+
+bool GameMenu::isMouseMode() const {
+  return Gothic::settingsGetI("GAME","menuMouse")!=0;
+  }
+
+GameMenu::Item* GameMenu::itemAt(const Tempest::Point& p) {
+  for(auto& it:hItems) {
+    if(!it.hasRect || it.name.empty() || !it.visible)
+      continue;
+    if(!isEnabled(it.handle) || isHidden(it.handle))
+      continue;
+    if(it.rect.contains(p))
+      return &it;
+    }
+  return nullptr;
+  }
+
+int GameMenu::indexOf(const Item* it) const {
+  for(uint32_t i=0;i<zenkit::IMenu::item_count;++i)
+    if(&hItems[i]==it)
+      return int(i);
+  return -1;
+  }
+
+void GameMenu::hoverAt(const Tempest::Point& p) {
+  auto* it = itemAt(p);
+  if(it==nullptr)
+    return;
+  if(!isSelectable(it->handle) && !isHorSelectable(it->handle))
+    return;
+
+  const int id = indexOf(it);
+  if(id<0 || uint32_t(id)==curItem)
+    return;
+
+  Gothic::inst().emitGlobalSound(Gothic::inst().loadSoundFx("MENU_BROWSE"));
+  setSelection(id,1);
+  if(auto s = selectedItem())
+    updateSavThumb(*s);
+  update();
+  }
+
+void GameMenu::setSlider(Item& it, int relX) {
+  auto& sec = it.handle->on_chg_set_option_section;
+  auto& opt = it.handle->on_chg_set_option;
+  if(sec.empty() || opt.empty())
+    return;
+
+  const int w = std::max(1,it.rect.w);
+  const float v = float(std::clamp(relX,0,w))/float(w);
+  Gothic::settingsSetF(sec,opt,v);
+  update();
+  }
+
+void GameMenu::activate(Item& it, int slideDx) {
+  Gothic::inst().emitGlobalSound(Gothic::inst().loadSoundFx("MENU_SELECT"));
+  exec(it,slideDx,KeyCodec::ActionGeneric);
+  }
+
+void GameMenu::mouseMoveEvent(Tempest::MouseEvent& e) {
+  if(!isMouseMode()) {
+    e.ignore();
+    return;
+    }
+  // keep the cursor free: accepting the move stops MainWindow from re-centering it in fullscreen
+  e.accept();
+  mousePos = e.pos();
+  hoverAt(e.pos());
+  }
+void GameMenu::mouseDownEvent(Tempest::MouseEvent& e) {
+  if(!isMouseMode() || e.button!=Tempest::MouseEvent::ButtonLeft) {
+    e.ignore();
+    return;
+    }
+  e.accept();
+  mousePos   = e.pos();
+  pressItem  = itemAt(e.pos());
+  sliderDrag = nullptr;
+  if(pressItem==nullptr)
+    return;
+
+  if(pressItem->handle->type==zenkit::MenuItemType::SLIDER) {
+    sliderDrag = pressItem;
+    setSlider(*sliderDrag, e.pos().x - sliderDrag->rect.x);
+    return;
+    }
+
+  const int id = indexOf(pressItem);
+  if(id>=0)
+    setSelection(id,1);
+  update();
+  }
+
+void GameMenu::mouseDragEvent(Tempest::MouseEvent& e) {
+  if(!isMouseMode()) {
+    e.ignore();
+    return;
+    }
+  e.accept();
+  if(sliderDrag==nullptr)
+    return;
+  setSlider(*sliderDrag, e.pos().x - sliderDrag->rect.x);
+  }
+
+void GameMenu::mouseUpEvent(Tempest::MouseEvent& e) {
+  if(!isMouseMode() || e.button!=Tempest::MouseEvent::ButtonLeft) {
+    e.ignore();
+    return;
+    }
+  e.accept();
+
+  if(sliderDrag!=nullptr) {
+    sliderDrag = nullptr;
+    pressItem  = nullptr;
+    return;
+    }
+
+  auto* it = pressItem;
+  pressItem = nullptr;
+  if(it==nullptr || it!=itemAt(e.pos()))
+    return;
+
+  int slideDx = 0;
+  if(it->handle->type==zenkit::MenuItemType::CHOICEBOX) {
+    // click the sides to step the option, click the middle to toggle it
+    const int relX = e.pos().x - it->rect.x;
+    if(relX < it->rect.w/3)
+      slideDx = -1; else
+    if(relX > it->rect.w*2/3)
+      slideDx = +1;
+    }
+
+  // activate() runs the item's actions and may close this menu (and delete this widget)
+  activate(*it, slideDx);
   }
