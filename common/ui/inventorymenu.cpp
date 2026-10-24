@@ -525,20 +525,42 @@ void InventoryMenu::mouseUpEvent(MouseEvent& e) {
 
   if(wasArmed && !repeated && mouseMode && e.button==MouseEvent::ButtonLeft) {
     // release without movement = click: use/equip, or take exactly one item
-    if(selectAt(start)) {
-      if(state==State::Equip) {
-        onItemAction(Item::NSLOT);
-        } else {
-        lootMode = LootMode::Normal;
-        takeCount = 1;              // exactly one; must not start the hold-repeat timer
-        onTakeStuff();
-        }
-      }
+    performClick(start);
     }
 
   adjustScroll();
   if(mouseMode)
     update();
+  }
+
+void InventoryMenu::performClick(const Point& pos) {
+  auto g = gridAt(pos);
+  if(g==nullptr)
+    return;
+  auto pg = sidePage(g->side);
+  if(pg==nullptr || g->wcount==0 || g->hcount==0)
+    return;
+
+  const size_t id = slotIdAt(*g,pos);
+  if(id>=pg->size())
+    return;
+  auto it = pg->get(id);
+  if(!it.isValid())
+    return;
+
+  if(pageOth!=nullptr)
+    page = g->side;
+  pageLocal[g->side].sel = id;
+  lastClickSide  = g->side;
+  lastClickIndex = id;
+
+  if(state==State::Equip) {
+    onItemAction(Item::NSLOT);
+    } else {
+    lootMode = LootMode::Normal;
+    takeCount = 1;                  // exactly one; must not start the hold-repeat timer
+    onTakeStuff();
+    }
   }
 
 void InventoryMenu::mouseDragEvent(MouseEvent& e) {
@@ -585,6 +607,34 @@ void InventoryMenu::mouseDoubleClickEvent(MouseEvent& e) {
     }
   if(!isMouseMode() || state==State::LockPicking)
     return;
+
+  mousePos     = e.pos();
+  mouseTracked = true;
+
+  // Tempest reports *any* two presses on the widget within one second as a double click, so a player
+  // clicking tabs (or two different items) at normal speed never reaches mouseDownEvent. A double
+  // click therefore has to behave exactly like a single click everywhere except on the same slot.
+  if(const int8_t t = tabAt(e.pos()); t>=0) {
+    switchTab(size_t(t));
+    update();
+    return;
+    }
+  if(takeAll.valid && takeAll.rect.contains(e.pos())) {
+    takeAllItems();
+    update();
+    return;
+    }
+
+  auto g = gridAt(e.pos());
+  if(g==nullptr)
+    return;
+  const size_t id = slotIdAt(*g,e.pos());
+  if(g->side!=lastClickSide || id!=lastClickIndex) {
+    performClick(e.pos());   // two quick clicks on different slots are two normal clicks
+    adjustScroll();
+    update();
+    return;
+    }
   performDoubleClick(e.pos());
   }
 

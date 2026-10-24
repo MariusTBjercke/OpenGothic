@@ -156,6 +156,8 @@ class InventoryMenu : public Tempest::Widget {
       };
 
     DragState                 drag;
+    uint8_t                   lastClickSide  = 2;   // 2 = no click yet
+    size_t                    lastClickIndex = 0;
     Tempest::Point            mousePos;
     bool                      mouseTracked = false;
 
@@ -216,6 +218,7 @@ class InventoryMenu : public Tempest::Widget {
     void            cycleTab(int dir);
     void            takeAllItems();
 
+    void            performClick(const Tempest::Point& pos);
     void            cancelDrag();
     void            resolveDrop(uint8_t srcSide, size_t clsId, int dstSide);
     void            performDoubleClick(const Tempest::Point& pos);

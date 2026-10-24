@@ -169,6 +169,17 @@ Gotchas:
   normal UI layer ends up *under* the item models — that is why the tooltip lives in the front pass now
   and uses a near-opaque plate (`UiDraw::tooltipPlane(..., 0.98f)`). Keep it there, and keep the plate
   opaque, or the icons will float over the tooltip text again.
+- **Tempest calls `mouseDoubleClickEvent` for *any* two presses on the same widget within 1000 ms**, and
+  it keeps doing so (every press updates the timer). A player clicking tabs or two different items at
+  normal speed therefore never reaches `mouseDownEvent` after the first click. A widget that overrides
+  `mouseDoubleClickEvent` must behave exactly like a single click unless the double click really targets
+  the same thing: `InventoryMenu::mouseDoubleClickEvent` routes tabs, the take-all button and a
+  *different* slot to the normal click path, and only a second click on the *same* slot takes the whole
+  stack (`lastClickSide`/`lastClickIndex`). This was the "tabs stop reacting after a couple of clicks"
+  bug — see the session log.
+- A second item click while the first item's use animation is still running is refused by the game
+  (`Npc::setAnimItem` needs `BS_STAND` and resets the player to idle), so a fast two-slot click test in
+  the harness looks like "nothing happened" even though the click was dispatched. Not a UI bug.
 - The hold-to-repeat timer starts on press. A player who presses, hesitates and then starts to drag
   used to take one item before the drag began; a movement of more than 1 px now restarts the delay
   (`mouseDragEvent`). Keep that if you touch the timer.
@@ -210,6 +221,25 @@ Gotchas:
   `invMouse=0` and expects vanilla keys to work.
 
 ## Session log
+
+### 2026-10-24 (afternoon): tab bar polish and the double-click trap
+
+- User report 1: item models floated over the tooltip text. The item models are drawn *between* the UI
+  layer and the front overlay (`Renderer::draw`), so the tooltip moved to `paintNumOverlay`
+  (`DrawPass::Front`) with a near-opaque plate.
+- User report 2: the tab bar was not the same width as the panel and did not fill its width evenly. The
+  strip is now flush on the panel(s), the cells are contiguous, the remainder is spread over the first
+  cells, and the grid got an explicit 4-sided frame (the cell textures have no border on their outer
+  left/top edge).
+- User report 3: tabs "locked" after a click or two, no fixed pattern. Root cause found with logging:
+  Tempest reports any two presses within a second as a double click, and `mouseDoubleClickEvent` only
+  handled grid slots, so from the second tab click on nothing happened (the pattern depended on click
+  speed). Fixed by routing double clicks by position; a second click on a *different* slot is a normal
+  click, only the same slot twice takes the whole stack. Verified with a 5-click rapid sequence ending
+  on the fifth tab.
+- Also hardened while there: a new press or leaving the window cancels a stale drag (a lost mouse-up
+  used to eat the next click), and the tab hit test is a geometric lookup so no pixel of the bar is
+  dead.
 
 ### 2026-10-24: UI overhaul v1
 
