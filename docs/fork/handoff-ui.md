@@ -68,7 +68,10 @@ Verified by the agent with synthetic input and screenshots (run dirs under `buil
 - dialogs: hovering a choice selects it and shows the accent band; clicking a choice takes it
   (`build/ui-dlg4/`), the choice panel no longer clips its last row.
 - main menu: hover changes the selection (the help line at the bottom follows) and shows the gold
-  marker, clicking "Options" opens the options menu (`build/ui-menu4/shot_12.png`).
+  marker, clicking "Options" opens the options menu (`build/ui-menu4/shot_12.png`); the load menu opens
+  with a click, hovering a slot moves the marker and the info line together (`build/ui-load/shot_11s.png`).
+- equip: a single left click on the weapon equips it (the slot shows the red equipped overlay and the
+  number-slot "1", `build/ui-equip/shot_30s.png`).
 - build + benchmark smoke test (twice, before and after the final fixes).
 
 **Not verified by the agent** (needs the user or a specific spot in the world):
@@ -86,10 +89,10 @@ Verified by the agent with synthetic input and screenshots (run dirs under `buil
 1. Play-test: inventory in a chest and with a trader, drag both ways, double click a stack, `Shift+A`.
 2. If a stack move is wrong, look at `InventoryMenu::resolveDrop` (it re-resolves by `clsId` and moves
    the whole current stack) and the per-state branches there.
-3. Save/load menu: verify the gold underline does not fight the savegame slot textures
-   (`GameMenu::drawItem`, the marker is skipped when the item has an image).
-4. Backlog from the plan: numeric HUD values and a damage trail on the bars, dialog page numbers for
-   long choice lists, tooltip for the equipped slot, item icons for the tabs (needs an asset pipeline).
+3. Wire `UiDraw::scrollBar` into the grids for tall inventories (the wheel works, the indicator is not
+   drawn yet), and consider numeric values + a damage trail on the HUD bars (phase 3 leftovers).
+4. Backlog from the plan: dialog page numbers for long choice lists, tooltip for the equipped slot, item
+   icons for the tabs (needs an asset pipeline).
 
 ## Code map (what is new or changed in this pass)
 
