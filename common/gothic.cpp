@@ -88,6 +88,11 @@ Gothic::Gothic() {
   defaults->set("GAME", "invMaxColumns",       5);
   defaults->set("GAME", "invMouse",            1); // fork: hover/click on inventory slots
   defaults->set("GAME", "invTabs",             1); // fork: category tabs in the inventory
+  defaults->set("GAME", "invScrim",            1); // fork: dim the world behind the inventory
+  defaults->set("GAME", "invTooltip",          1); // fork: item tooltip at the cursor
+  defaults->set("GAME", "dlgMouse",            1); // fork: hover/click dialog choices
+  defaults->set("GAME", "menuMouse",           1); // fork: hover/click scripted menus
+  defaults->set("GAME", "docMouse",            1); // fork: click a document to close it
   defaults->set("GAME", "animatedWindows",     1);
   defaults->set("GAME", "useGothic1Controls",  1);
   defaults->set("GAME", "highlightMeleeFocus", 0);

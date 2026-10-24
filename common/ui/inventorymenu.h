@@ -7,6 +7,7 @@
 #include "graphics/inventoryrenderer.h"
 #include "game/inventory.h"
 #include "ui/inventorytabs.h"
+#include "ui/uidraw.h"
 
 class Npc;
 class Item;
@@ -49,6 +50,7 @@ class InventoryMenu : public Tempest::Widget {
     void  open(Npc& pl,Interactive& chest);
     State isOpen() const;
     bool  isActive() const;
+    bool  wantsCursor() const; // fork: true while the window drives the mouse cursor itself
     void  onWorldChanged();
 
     void  tick(uint64_t dt);
@@ -67,6 +69,9 @@ class InventoryMenu : public Tempest::Widget {
     void  mouseMoveEvent (Tempest::MouseEvent& event) override;
     void  mouseDragEvent (Tempest::MouseEvent& event) override;
     void  mouseWheelEvent(Tempest::MouseEvent& event) override;
+    void  mouseDoubleClickEvent(Tempest::MouseEvent& event) override;
+    void  mouseEnterEvent(Tempest::MouseEvent& event) override;
+    void  mouseLeaveEvent(Tempest::MouseEvent& event) override;
 
   private:
     struct Page;
@@ -132,9 +137,31 @@ class InventoryMenu : public Tempest::Widget {
     ActionArea                takeAll;
     bool                      takeAllHover  = false;
 
+    // fork: drag & drop and cursor tooltip, see docs/fork/plan-ui-overhaul.md
+    struct DragState final {
+      bool            armed    = false; // pressed on a slot, not yet a drag
+      bool            active   = false; // moved past the threshold with the button held
+      bool            repeated = false; // the hold-repeat timer already acted on this slot
+      uint8_t         side     = 1;     // source side (0 - other, 1 - player)
+      size_t          clsId    = 0;
+      size_t          count    = 0;
+      size_t          index    = 0;
+      Tempest::Point  start;
+      Tempest::Point  pos;
+      int             target   = -1;    // grid under the cursor: side index, -1 = none
+      };
+
+    DragState                 drag;
+    Tempest::Point            mousePos;
+    bool                      mouseTracked = false;
+
+    // layout helpers, all scale aware
     size_t                    rowsCount() const;
     int                       gridTop() const;
     int                       padd() const;
+    int                       panelPad() const;
+    int                       headerH() const;
+    int                       footerH() const;
 
     Tempest::Size             slotSize() const;
     int                       infoHeight() const;
@@ -151,30 +178,43 @@ class InventoryMenu : public Tempest::Widget {
 
     void          onItemAction(uint8_t slotHint);
     void          onTakeStuff();
+    void          onHoldTick();
     void          adjustScroll();
     void          drawAll   (Tempest::Painter& p, Npc& player, DrawPass pass);
-    void          drawItems (Tempest::Painter& p, DrawPass pass, const Page &inv, const PageLocal &sel, int x, int y, int wcount, int hcount);
+    void          drawItems (Tempest::Painter& p, DrawPass pass, const Page &inv, const PageLocal &sel,
+                             uint8_t side, int x, int y, int wcount, int hcount);
     void          drawSlot  (Tempest::Painter& p, DrawPass pass, const Inventory::Iterator& it,
                              const Page& page, const PageLocal &sel, int x, int y, size_t id);
-    void          drawGold  (Tempest::Painter& p, Npc &player, int x, int y);
-    void          drawHeader(Tempest::Painter& p, std::string_view title, int x, int y);
+    void          drawGold  (Tempest::Painter& p, int x, int y, int w);
     void          drawInfo  (Tempest::Painter& p);
-    void          drawTabs  (Tempest::Painter& p, const Page& page, int x, int w);
-    void          drawTakeAll(Tempest::Painter& p, int x, int y, int w);
+    void          drawPanel (Tempest::Painter& p, const Tempest::Rect& panel, const Tempest::Rect& header,
+                             const Tempest::Rect& footer, bool playerSide, std::string_view title);
+    void          drawTabs  (Tempest::Painter& p, const Tempest::Rect& strip, const Page& page);
+    void          drawTakeAll(Tempest::Painter& p, const Tempest::Rect& header);
+    void          drawTooltip(Tempest::Painter& p);
+    void          drawDragGhost(Tempest::Painter& p);
+    std::string_view hints() const;
 
     bool            isMouseMode() const;
     bool            isTabsMode() const;
+    bool            isScrimMode() const;
+    bool            isTooltipMode() const;
     auto            inventoryFilter() const -> const Inventory::ItemFilter*;
     uint8_t         activeSide() const;
     const Page*     sidePage(uint8_t side) const;
     const GridArea* gridAt(const Tempest::Point& pos) const;
     bool            selectAt(const Tempest::Point& pos);
     void            scrollGrid(uint8_t side, int rows);
+    size_t          slotIdAt(const GridArea& g, const Tempest::Point& pos) const;
 
     int8_t          tabAt(const Tempest::Point& pos) const;
     void            switchTab(size_t tab);
     void            cycleTab(int dir);
     void            takeAllItems();
+
+    void            cancelDrag();
+    void            resolveDrop(uint8_t srcSide, size_t clsId, int dstSide);
+    void            performDoubleClick(const Tempest::Point& pos);
 
     void             updateCursor();
   };

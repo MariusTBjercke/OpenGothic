@@ -6,7 +6,11 @@
 #include <cmath>
 
 #include "game/constants.h"
+#include "game/gamescript.h"
+#include "game/inventory.h"
 #include "world/objects/item.h"
+#include "world/world.h"
+#include "gothic.h"
 
 InventoryTabs::InventoryTabs() {
   rebuild();
@@ -15,40 +19,74 @@ InventoryTabs::InventoryTabs() {
 std::string_view InventoryTabs::label(size_t tab) {
   switch(Tab(tab)) {
     case All:      return "All";
-    case Weapons:  return "Weapons";
+    case Melee:    return "Melee";
+    case Ranged:   return "Ranged";
     case Armor:    return "Armor";
     case Potions:  return "Potions";
     case Food:     return "Food";
-    case Writings: return "Writings";
     case Magic:    return "Magic";
+    case Writings: return "Writings";
+    case Trophies: return "Trophies";
+    case Keys:     return "Keys";
     case Other:    return "Other";
     case Count:    break;
     }
   return "";
   }
 
-bool InventoryTabs::matches(size_t tab, const Item& item) {
-  const uint32_t main      = uint32_t(item.mainFlag());
-  constexpr uint32_t weapons = uint32_t(ITM_CAT_NF)|uint32_t(ITM_CAT_FF)|uint32_t(ITM_CAT_MUN);
-  constexpr uint32_t armor   = uint32_t(ITM_CAT_ARMOR);
-  constexpr uint32_t potion  = uint32_t(ITM_CAT_POTION);
-  constexpr uint32_t food    = uint32_t(ITM_CAT_FOOD);
-  constexpr uint32_t docs    = uint32_t(ITM_CAT_DOCS);
-  constexpr uint32_t magic   = uint32_t(ITM_CAT_RUNE)|uint32_t(ITM_CAT_MAGIC);
-  constexpr uint32_t known   = weapons|armor|potion|food|docs|magic;
+std::string_view InventoryTabs::instanceName(const Item& item) const {
+  auto w = Gothic::inst().world();
+  if(w==nullptr)
+    return {};
+  auto sym = w->script().findSymbol(item.clsId());
+  if(sym==nullptr)
+    return {};
+  return sym->name();
+  }
 
-  switch(Tab(tab)) {
-    case All:      return true;
-    case Weapons:  return (main & weapons)!=0;
-    case Armor:    return (main & armor)!=0;
-    case Potions:  return (main & potion)!=0;
-    case Food:     return (main & food)!=0;
-    case Writings: return (main & docs)!=0;
-    case Magic:    return (main & magic)!=0;
-    case Other:    return (main & known)==0;
-    case Count:    break;
+uint8_t InventoryTabs::category(const Item& item) const {
+  const size_t clsId = item.clsId();
+  if(const auto it = catCache.find(clsId); it!=catCache.end())
+    return it->second;
+
+  const uint32_t main = uint32_t(item.mainFlag());
+  uint8_t        cat  = Other;
+
+  // name first for the two families that flags do not describe; a trophy/keys item may carry any flag
+  const auto name = instanceName(item);
+  if(name.size()>=5 && name[0]=='I' && name[1]=='t') {
+    if(name[2]=='A' && name[3]=='t' && name[4]=='_')
+      cat = Trophies;
+    if(name[2]=='K' && name[3]=='e' && name[4]=='_')
+      cat = Keys;
     }
-  return true;
+
+  if(cat==Other) {
+    if((main & uint32_t(ITM_CAT_NF))!=0)
+      cat = Melee;
+    else if((main & (uint32_t(ITM_CAT_FF)|uint32_t(ITM_CAT_MUN)))!=0)
+      cat = Ranged;
+    else if((main & uint32_t(ITM_CAT_ARMOR))!=0)
+      cat = Armor;
+    else if((main & uint32_t(ITM_CAT_POTION))!=0)
+      cat = Potions;
+    else if((main & uint32_t(ITM_CAT_FOOD))!=0)
+      cat = Food;
+    else if((main & (uint32_t(ITM_CAT_RUNE)|uint32_t(ITM_CAT_MAGIC)))!=0)
+      cat = Magic;
+    else if((main & uint32_t(ITM_CAT_DOCS))!=0)
+      cat = Writings;
+    }
+
+  catCache[clsId] = cat;
+  return cat;
+  }
+
+void InventoryTabs::categories(const Inventory& inv, bool out[Count]) const {
+  for(size_t i=0;i<size_t(Count);++i)
+    out[i] = (i==size_t(All));
+  for(auto it = inv.iterator(Inventory::T_Inventory); it.isValid(); ++it)
+    out[category(*it)] = true;
   }
 
 void InventoryTabs::setActive(size_t tab) {
@@ -64,10 +102,16 @@ void InventoryTabs::cycle(int dir) {
   setActive(size_t(id));
   }
 
+void InventoryTabs::resetCache() {
+  catCache.clear();
+  }
+
 void InventoryTabs::rebuild() {
   const size_t id = activeId;
-  filt = [id](const Item& item) {
-    return matches(id, item);
+  filt = [this,id](const Item& item) {
+    if(id==size_t(All))
+      return true;
+    return category(item)==id;
     };
   }
 
@@ -113,7 +157,24 @@ void fillCircle(Tempest::Painter& p, float cx, float cy, float r) {
   fillFan(p, pts, N);
   }
 
-constexpr size_t polyMax = 16;
+// Ring: built from small radial quads, so the hole stays open (a centroid fan over an
+// alternating-radius polygon would just fill the disc).
+void fillRing(Tempest::Painter& p, float cx, float cy, float rOut, float rIn) {
+  constexpr int N = 20;
+  for(int i=0;i<N;++i) {
+    const float a0 = float(i  )*2.f*3.14159265f/float(N);
+    const float a1 = float(i+1)*2.f*3.14159265f/float(N);
+    Pt quad[4] = {
+      Pt{cx + rOut*std::cos(a0), cy + rOut*std::sin(a0)},
+      Pt{cx + rOut*std::cos(a1), cy + rOut*std::sin(a1)},
+      Pt{cx + rIn *std::cos(a1), cy + rIn *std::sin(a1)},
+      Pt{cx + rIn *std::cos(a0), cy + rIn *std::sin(a0)},
+      };
+    fillFan(p, quad, 4);
+    }
+  }
+
+constexpr size_t polyMax = 24;
 
 struct Points {
   Pt     v[polyMax];
@@ -134,6 +195,7 @@ void InventoryTabs::paintGlyph(Tempest::Painter& p, size_t tab, const Tempest::R
   auto Y = [&](float y) { return int(float(r.y) + y*sy); };
   auto W = [&](float w) { return std::max(1, int(w*sx)); };
   auto H = [&](float h) { return std::max(1, int(h*sy)); };
+  auto F = [&](float v) { return v*sx; };
 
   p.setBrush(Tempest::Color(0.93f,0.93f,0.93f,alpha));
   switch(Tab(tab)) {
@@ -144,7 +206,7 @@ void InventoryTabs::paintGlyph(Tempest::Painter& p, size_t tab, const Tempest::R
           p.drawRect(X(float(j)*(q+g)+2), Y(float(i)*(q+g)+2), W(q), H(q));
       break;
       }
-    case Weapons: {
+    case Melee: {
       Points blade;
       blade.add(X(32),Y(2)); blade.add(X(39),Y(16)); blade.add(X(39),Y(38));
       blade.add(X(32),Y(45)); blade.add(X(25),Y(38)); blade.add(X(25),Y(16));
@@ -152,6 +214,25 @@ void InventoryTabs::paintGlyph(Tempest::Painter& p, size_t tab, const Tempest::R
       p.drawRect(X(8), Y(38), W(48), H(6));   // guard
       p.drawRect(X(28),Y(44), W(8),  H(9));   // grip
       p.drawRect(X(22),Y(53), W(20), H(5));   // pommel
+      break;
+      }
+    case Ranged: {
+      // bow: a thick crescent with the string on its right and an arrow resting on it
+      Points bow;
+      for(int i=0;i<=8;++i) {
+        const float a = -1.20f + 2.40f*float(i)/8.f;
+        bow.add(X(36.f - 24.f*std::cos(a)), Y(32.f + 30.f*std::sin(a)));
+        }
+      for(int i=8;i>=0;--i) {
+        const float a = -1.20f + 2.40f*float(i)/8.f;
+        bow.add(X(36.f - 12.f*std::cos(a)), Y(32.f + 30.f*std::sin(a)));
+        }
+      fillPoints(p,bow);
+      p.drawRect(X(26),Y(3), W(3), H(58));    // string
+      p.drawRect(X(12),Y(30), W(36), H(4));   // arrow shaft
+      Points tip;
+      tip.add(X(46),Y(24)); tip.add(X(58),Y(32)); tip.add(X(46),Y(40));
+      fillPoints(p,tip);
       break;
       }
     case Armor: {
@@ -195,6 +276,24 @@ void InventoryTabs::paintGlyph(Tempest::Painter& p, size_t tab, const Tempest::R
         star.add(X(32.f + rad*std::cos(ang)), Y(32.f + rad*std::sin(ang)));
         }
       fillPoints(p,star);
+      break;
+      }
+    case Trophies: {
+      // fang with two roots: reads as "animal part" at icon size
+      p.drawRect(X(14),Y(8), W(36), H(11));
+      Points left;
+      left.add(X(17),Y(19)); left.add(X(30),Y(19)); left.add(X(27),Y(57));
+      fillPoints(p,left);
+      Points right;
+      right.add(X(34),Y(19)); right.add(X(47),Y(19)); right.add(X(38),Y(57));
+      fillPoints(p,right);
+      break;
+      }
+    case Keys: {
+      fillRing(p, float(X(20)), float(Y(20)), F(16.f), F(8.f));
+      p.drawRect(X(28),Y(17), W(28), H(6));   // shaft
+      p.drawRect(X(46),Y(20), W(5),  H(14));  // tooth
+      p.drawRect(X(37),Y(20), W(5),  H(10));  // tooth
       break;
       }
     case Other: {
